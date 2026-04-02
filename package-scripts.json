@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "check-products": "node scripts/checkProducts.js",
+    "clean-expired-drafts": "node scripts/cleanExpiredDrafts.js"
+  }
+}
