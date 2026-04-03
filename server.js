@@ -12,6 +12,9 @@ const draftRoutes = require('./routes/drafts');
 const imagekitRoutes = require('./routes/imagekit');
 const aiRoutes = require('./routes/ai');
 const deliveryRoutes = require('./routes/delivery');
+const orderRoutes = require('./routes/orders');
+const paymentVerifyRoutes = require('./routes/paymentVerify');
+const shopAIRoutes = require('./routes/shopAI');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +36,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/imagekit', imagekitRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payment-verify', paymentVerifyRoutes);
+app.use('/api/shop-ai', shopAIRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Backend server is running with database!' });

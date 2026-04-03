@@ -109,12 +109,55 @@ const sellerSchema = new mongoose.Schema({
     uploaded: Boolean,
     updatedAt: Date
   },
+  // Payment settings
+  payment: {
+    // MTN Mobile Money
+    mtnMomo: {
+      enabled: { type: Boolean, default: false },
+      phoneNumber: { type: String, trim: true },
+      accountName: { type: String, trim: true },
+    },
+    // Airtel Money
+    airtelMoney: {
+      enabled: { type: Boolean, default: false },
+      phoneNumber: { type: String, trim: true },
+      accountName: { type: String, trim: true },
+    },
+    // Bank Transfer
+    bankTransfer: {
+      enabled: { type: Boolean, default: false },
+      bankName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      accountName: { type: String, trim: true },
+      branch: { type: String, trim: true },
+    },
+    // Cash on Delivery
+    cashOnDelivery: { type: Boolean, default: true },
+  },
+
   // Account status
   status: {
     type: String,
     enum: ['pending', 'active', 'suspended', 'banned'],
     default: 'pending'
   },
+  // Payment settings
+  payment: {
+    // MTN Mobile Money
+    mtnName: { type: String, trim: true },
+    mtnNumber: { type: String, trim: true },
+    // Airtel Money
+    airtelName: { type: String, trim: true },
+    airtelNumber: { type: String, trim: true },
+    // Bank
+    bankName: { type: String, trim: true },
+    bankAccountName: { type: String, trim: true },
+    bankAccountNumber: { type: String, trim: true },
+    bankBranch: { type: String, trim: true },
+    // Preferred
+    preferredMethod: { type: String, enum: ['mtn', 'airtel', 'bank', 'all', ''], default: '' },
+  },
+
   // Delivery settings
   delivery: {
     offersDelivery: { type: Boolean, default: false },

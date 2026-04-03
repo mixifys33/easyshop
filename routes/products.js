@@ -206,6 +206,25 @@ router.post('/', async (req, res) => {
       status: 'active',
       isDraft: false
     });
+
+    // Inherit seller's payment methods
+    try {
+      const Seller = require('../models/Seller');
+      const seller = await Seller.findById(productData.sellerId).select('payment');
+      if (seller?.payment) {
+        product.paymentMethods = {
+          mtnName: seller.payment.mtnName || '',
+          mtnNumber: seller.payment.mtnNumber || '',
+          airtelName: seller.payment.airtelName || '',
+          airtelNumber: seller.payment.airtelNumber || '',
+          bankName: seller.payment.bankName || '',
+          bankAccountName: seller.payment.bankAccountName || '',
+          bankAccountNumber: seller.payment.bankAccountNumber || '',
+          bankBranch: seller.payment.bankBranch || '',
+          preferredMethod: seller.payment.preferredMethod || '',
+        };
+      }
+    } catch (e) { console.log('Could not inherit payment methods:', e.message); }
     
     console.log('📦 Product object created, saving to database...');
     
@@ -716,6 +735,25 @@ router.post('/bulk-upload/process', authenticateSeller, async (req, res) => {
           createdAt: new Date(),
           updatedAt: new Date()
         });
+
+        // Inherit seller's payment methods
+        try {
+          const Seller = require('../models/Seller');
+          const seller = await Seller.findById(sellerId).select('payment');
+          if (seller?.payment) {
+            product.paymentMethods = {
+              mtnName: seller.payment.mtnName || '',
+              mtnNumber: seller.payment.mtnNumber || '',
+              airtelName: seller.payment.airtelName || '',
+              airtelNumber: seller.payment.airtelNumber || '',
+              bankName: seller.payment.bankName || '',
+              bankAccountName: seller.payment.bankAccountName || '',
+              bankAccountNumber: seller.payment.bankAccountNumber || '',
+              bankBranch: seller.payment.bankBranch || '',
+              preferredMethod: seller.payment.preferredMethod || '',
+            };
+          }
+        } catch (e) { /* silent */ }
 
         await product.save();
         results.success++;

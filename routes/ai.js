@@ -9,12 +9,19 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Free models in priority order — first available will be used
 const FREE_MODELS = [
   process.env.OPENROUTER_MODEL,
-  'minimax/minimax-m2.5:free',
-  'google/gemma-3-4b-it:free',
-  'openai/gpt-oss-20b:free',
-  'openai/gpt-oss-120b:free',
-  'google/gemma-3-12b-it:free',
-  'google/gemma-3-27b-it:free',
+  'openrouter/auto',
+     'openrouter/polaris-alpha',
+     'openrouter/hunter-alpha',
+     'openrouter/healer-alpha',
+   'google/lyria-3-pro-preview',
+   'qwen/qwen3.6-plus:free',
+   'google/lyria-3-clip-preview',
+   'openrouter/free',
+   'openrouter/bert-nebulon-alpha',
+   'openrouter/sherlock-think-alpha',
+   'google/gemma-3-4b-it:free',
+   'google/gemma-3-12b-it:free',
+   'openrouter/andromeda-alpha',
   'nvidia/nemotron-nano-12b-v2-vl:free',
 ].filter(Boolean);
 

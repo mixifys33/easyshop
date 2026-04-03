@@ -841,11 +841,365 @@ const sendWelcomeEmail = async (email, name) => {
   }
 };
 
+// ─── ORDER CONFIRMATION EMAIL (to buyer) ────────────────────────────────────
+const sendOrderConfirmationToUser = async (email, userName, order) => {
+  const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
+  const total = (order.subtotal || 0) + (order.deliveryFee || 0);
+  const itemsHtml = (order.items || []).map(i => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+        ${i.image ? `<img src="${i.image}" width="60" height="60" style="border-radius:8px;object-fit:cover;" />` : ''}
+      </td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+        <strong>${i.name}</strong><br/>
+        <span style="color:#888;font-size:13px;">Qty: ${i.quantity}</span>
+      </td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#27ae60;">
+        UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
+      </td>
+    </tr>`).join('');
+
+  const proofHtml = (order.proofImages || []).map(p =>
+    `<img src="${p.url}" style="width:140px;height:100px;object-fit:cover;border-radius:8px;margin:4px;" />`
+  ).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#27ae60,#2ecc71);padding:36px 30px;text-align:center;color:#fff;">
+      <div style="font-size:48px;">🛍️</div>
+      <h1 style="margin:10px 0 4px;">Order Confirmed!</h1>
+      <p style="opacity:.9;font-size:16px;">Thank you for shopping with EasyShop</p>
+    </div>
+    <div style="padding:30px;">
+      <p style="font-size:16px;color:#333;">Hi <strong>${userName || 'Valued Customer'}</strong> 👋</p>
+      <p style="color:#555;">Your order has been placed successfully. Here are your order details:</p>
+
+      <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #27ae60;">
+        <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Delivery:</strong> ${order.delivery?.name || 'N/A'} (${order.delivery?.estimatedDays || '?'} days)</p>
+        <p style="margin:0;"><strong>Status:</strong> <span style="color:#9b59b6;font-weight:700;">Pending</span></p>
+      </div>
+
+      <h3 style="color:#333;margin-bottom:12px;">Items Ordered</h3>
+      <table style="width:100%;border-collapse:collapse;">${itemsHtml}</table>
+
+      <div style="background:#f0faf4;border-radius:10px;padding:16px;margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#666;">Subtotal</span><span>UGX ${(order.subtotal || 0).toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#666;">Delivery Fee</span><span>UGX ${(order.deliveryFee || 0).toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid #d5f0e0;padding-top:10px;margin-top:6px;">
+          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#27ae60;">UGX ${total.toLocaleString()}</strong>
+        </div>
+      </div>
+
+      ${proofHtml ? `<div style="margin-top:20px;"><h3 style="color:#333;margin-bottom:10px;">Payment Proof Submitted</h3><div>${proofHtml}</div></div>` : ''}
+
+      <div style="background:#fff3cd;border-radius:10px;padding:16px;margin-top:20px;border-left:4px solid #f39c12;">
+        <p style="margin:0;color:#856404;font-size:14px;">📦 Your order is being reviewed by the seller. You'll receive updates as it progresses.</p>
+      </div>
+    </div>
+    <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
+      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+    </div>
+  </div></body></html>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      to: email,
+      subject: `✅ Order Confirmed ${orderId} — EasyShop`,
+      html,
+    });
+    console.log('[email] Order confirmation sent to user:', info.messageId);
+    return { success: true };
+  } catch (e) {
+    console.error('[email] Failed to send order confirmation to user:', e.message);
+    return { success: false, error: e.message };
+  }
+};
+
+// ─── NEW ORDER NOTIFICATION EMAIL (to seller) ────────────────────────────────
+const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) => {
+  const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
+  const total = (order.subtotal || 0) + (order.deliveryFee || 0);
+  const itemsHtml = (order.items || []).map(i => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+        ${i.image ? `<img src="${i.image}" width="60" height="60" style="border-radius:8px;object-fit:cover;" />` : ''}
+      </td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+        <strong>${i.name}</strong><br/>
+        <span style="color:#888;font-size:13px;">Qty: ${i.quantity} × UGX ${(i.price || 0).toLocaleString()}</span>
+      </td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#3498db;">
+        UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
+      </td>
+    </tr>`).join('');
+
+  const proofHtml = (order.proofImages || []).map(p =>
+    `<img src="${p.url}" style="width:140px;height:100px;object-fit:cover;border-radius:8px;margin:4px;" />`
+  ).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#3498db,#2980b9);padding:36px 30px;text-align:center;color:#fff;">
+      <div style="font-size:48px;">🔔</div>
+      <h1 style="margin:10px 0 4px;">New Order Received!</h1>
+      <p style="opacity:.9;font-size:16px;">You have a new order to fulfill</p>
+    </div>
+    <div style="padding:30px;">
+      <p style="font-size:16px;color:#333;">Hi <strong>${sellerName || 'Seller'}</strong> 👋</p>
+      <p style="color:#555;">Great news! A customer has placed an order from your shop. Please review and process it promptly.</p>
+
+      <div style="background:#ebf5fb;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #3498db;">
+        <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 6px;"><strong>Customer:</strong> ${buyerName || order.buyerInfo?.name || order.customerInfo?.fullName || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Phone:</strong> ${order.buyerInfo?.phone || order.customerInfo?.phone || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Delivery:</strong> ${order.delivery?.name || 'N/A'} (${order.delivery?.estimatedDays || '?'} days)</p>
+        ${order.customerInfo?.address ? `<p style="margin:0;"><strong>Address:</strong> ${order.customerInfo.address}, ${order.customerInfo.city || ''}</p>` : ''}
+        ${order.customerInfo?.notes ? `<p style="margin:6px 0 0;"><strong>Notes:</strong> ${order.customerInfo.notes}</p>` : ''}
+      </div>
+
+      <h3 style="color:#333;margin-bottom:12px;">Items to Fulfill</h3>
+      <table style="width:100%;border-collapse:collapse;">${itemsHtml}</table>
+
+      <div style="background:#ebf5fb;border-radius:10px;padding:16px;margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#666;">Subtotal</span><span>UGX ${(order.subtotal || 0).toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="color:#666;">Delivery Fee</span><span>UGX ${(order.deliveryFee || 0).toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid #aed6f1;padding-top:10px;margin-top:6px;">
+          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#3498db;">UGX ${total.toLocaleString()}</strong>
+        </div>
+      </div>
+
+      ${proofHtml ? `<div style="margin-top:20px;"><h3 style="color:#333;margin-bottom:10px;">Payment Proof from Customer</h3><div>${proofHtml}</div></div>` : ''}
+
+      <div style="background:#d5f5e3;border-radius:10px;padding:16px;margin-top:20px;border-left:4px solid #27ae60;">
+        <p style="margin:0;color:#1e8449;font-size:14px;font-weight:600;">⚡ Action Required: Please process this order and update its status in your seller dashboard.</p>
+      </div>
+    </div>
+    <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🏪 EasyShop Seller Portal</p>
+      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+    </div>
+  </div></body></html>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: { name: 'EasyShop Orders', address: process.env.SMTP_USER },
+      to: sellerEmail,
+      subject: `🔔 New Order ${orderId} — Action Required`,
+      html,
+    });
+    console.log('[email] New order notification sent to seller:', info.messageId);
+    return { success: true };
+  } catch (e) {
+    console.error('[email] Failed to send new order to seller:', e.message);
+    return { success: false, error: e.message };
+  }
+};
+
+// ─── ORDER CANCELLATION / REFUND EMAIL (to seller) ───────────────────────────
+const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerName, buyerEmail) => {
+  const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
+  const total = (order.subtotal || 0) + (order.deliveryFee || 0);
+  const itemsHtml = (order.items || []).map(i => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;"><strong>${i.name}</strong></td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:center;">${i.quantity}</td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;">UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#e74c3c,#c0392b);padding:36px 30px;text-align:center;color:#fff;">
+      <div style="font-size:48px;">❌</div>
+      <h1 style="margin:10px 0 4px;">Order Cancelled</h1>
+      <p style="opacity:.9;font-size:16px;">A customer has cancelled their order — refund required</p>
+    </div>
+    <div style="padding:30px;">
+      <p style="font-size:16px;color:#333;">Hi <strong>${sellerName || 'Seller'}</strong>,</p>
+      <p style="color:#555;">The following order has been cancelled by the customer. Please initiate the refund process as soon as possible.</p>
+
+      <div style="background:#fdecea;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #e74c3c;">
+        <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 6px;"><strong>Customer Name:</strong> ${buyerName || order.buyerInfo?.name || order.customerInfo?.fullName || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Customer Email:</strong> ${buyerEmail || order.buyerInfo?.email || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Customer Phone:</strong> ${order.buyerInfo?.phone || order.customerInfo?.phone || 'N/A'}</p>
+        <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
+        <p style="margin:0;"><strong>Amount to Refund:</strong> <span style="color:#e74c3c;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+      </div>
+
+      <h3 style="color:#333;margin-bottom:12px;">Cancelled Items</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#f8f9fa;">
+          <th style="padding:10px;text-align:left;">Item</th>
+          <th style="padding:10px;text-align:center;">Qty</th>
+          <th style="padding:10px;text-align:right;">Amount</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+
+      <div style="background:#fff3cd;border-radius:12px;padding:20px;margin-top:20px;border-left:4px solid #f39c12;">
+        <h3 style="color:#856404;margin-bottom:12px;">⚠️ Refund Process — Action Required</h3>
+        <ol style="color:#856404;padding-left:20px;line-height:2;">
+          <li>Contact the customer at <strong>${buyerEmail || order.buyerInfo?.email || 'N/A'}</strong> or <strong>${order.buyerInfo?.phone || order.customerInfo?.phone || 'N/A'}</strong></li>
+          <li>Confirm the payment amount received: <strong>UGX ${total.toLocaleString()}</strong></li>
+          <li>Initiate the refund via the same payment method used: <strong>${order.paymentMethod?.toUpperCase() || 'N/A'}</strong></li>
+          <li>Complete the refund within <strong>3–5 business days</strong></li>
+          <li>Notify the customer once the refund has been sent</li>
+        </ol>
+      </div>
+
+      <p style="color:#888;font-size:13px;margin-top:20px;">If you have any questions about this cancellation, please contact EasyShop support.</p>
+    </div>
+    <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🏪 EasyShop Seller Portal</p>
+      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+    </div>
+  </div></body></html>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: { name: 'EasyShop Orders', address: process.env.SMTP_USER },
+      to: sellerEmail,
+      subject: `❌ Order Cancelled ${orderId} — Refund Required`,
+      html,
+    });
+    console.log('[email] Cancellation/refund email sent to seller:', info.messageId);
+    return { success: true };
+  } catch (e) {
+    console.error('[email] Failed to send cancellation to seller:', e.message);
+    return { success: false, error: e.message };
+  }
+};
+
+// ─── CANCELLATION CONFIRMATION EMAIL (to buyer) ──────────────────────────────
+const sendCancellationToUser = async (email, userName, order) => {
+  const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
+  const total = (order.subtotal || 0) + (order.deliveryFee || 0);
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#f39c12,#e67e22);padding:36px 30px;text-align:center;color:#fff;">
+      <div style="font-size:48px;">🔄</div>
+      <h1 style="margin:10px 0 4px;">Order Cancelled</h1>
+      <p style="opacity:.9;font-size:16px;">Your refund is being processed</p>
+    </div>
+    <div style="padding:30px;">
+      <p style="font-size:16px;color:#333;">Hi <strong>${userName || 'Valued Customer'}</strong>,</p>
+      <p style="color:#555;">Your order has been successfully cancelled. The seller has been notified and will process your refund shortly.</p>
+
+      <div style="background:#fef9ec;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #f39c12;">
+        <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
+        <p style="margin:0;"><strong>Refund Amount:</strong> <span style="color:#e67e22;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+      </div>
+
+      <div style="background:#d5f5e3;border-radius:12px;padding:20px;margin-top:16px;border-left:4px solid #27ae60;">
+        <h3 style="color:#1e8449;margin-bottom:10px;">💰 What Happens Next?</h3>
+        <ol style="color:#1e8449;padding-left:20px;line-height:2;">
+          <li>The seller has been notified of your cancellation</li>
+          <li>They will contact you to confirm refund details</li>
+          <li>Your refund of <strong>UGX ${total.toLocaleString()}</strong> will be sent via <strong>${order.paymentMethod?.toUpperCase() || 'your original payment method'}</strong></li>
+          <li>Refunds typically take <strong>3–5 business days</strong></li>
+        </ol>
+      </div>
+
+      <p style="color:#888;font-size:13px;margin-top:20px;">If you don't receive your refund within 5 business days, please contact EasyShop support.</p>
+    </div>
+    <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
+      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+    </div>
+  </div></body></html>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      to: email,
+      subject: `🔄 Order Cancelled ${orderId} — Refund In Progress`,
+      html,
+    });
+    console.log('[email] Cancellation confirmation sent to user:', info.messageId);
+    return { success: true };
+  } catch (e) {
+    console.error('[email] Failed to send cancellation to user:', e.message);
+    return { success: false, error: e.message };
+  }
+};
+
+// ─── REFUND COMPLETED EMAIL (to buyer) ──────────────────────────────────────
+const sendRefundCompletedToUser = async (email, userName, order, refundDetails) => {
+  const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
+  const total = (order.subtotal || 0) + (order.deliveryFee || 0);
+  const method = refundDetails?.method || order.paymentMethod?.toUpperCase() || 'N/A';
+  const reference = refundDetails?.reference || '';
+  const notes = refundDetails?.notes || '';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#27ae60,#2ecc71);padding:36px 30px;text-align:center;color:#fff;">
+      <div style="font-size:48px;">✅</div>
+      <h1 style="margin:10px 0 4px;">Refund Completed!</h1>
+      <p style="opacity:.9;font-size:16px;">Your refund has been processed successfully</p>
+    </div>
+    <div style="padding:30px;">
+      <p style="font-size:16px;color:#333;">Hi <strong>${userName || 'Valued Customer'}</strong>,</p>
+      <p style="color:#555;">Great news! The seller has completed your refund. Please check your account for the refunded amount.</p>
+
+      <div style="background:#f0faf4;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #27ae60;">
+        <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 6px;"><strong>Refund Amount:</strong> <span style="color:#27ae60;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+        <p style="margin:0 0 6px;"><strong>Refund Method:</strong> ${method}</p>
+        ${reference ? `<p style="margin:0 0 6px;"><strong>Transaction Reference:</strong> ${reference}</p>` : ''}
+        ${notes ? `<p style="margin:0;"><strong>Note from Seller:</strong> ${notes}</p>` : ''}
+      </div>
+
+      <div style="background:#e8f8f0;border-radius:10px;padding:16px;margin-top:16px;border-left:4px solid #27ae60;">
+        <p style="margin:0;color:#1e8449;font-size:14px;">💰 If you don't see the refund in your account within 24 hours, please contact EasyShop support with your order ID: <strong>${orderId}</strong></p>
+      </div>
+    </div>
+    <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
+      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+    </div>
+  </div></body></html>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      to: email,
+      subject: `✅ Refund Completed ${orderId} — UGX ${total.toLocaleString()} Sent`,
+      html,
+    });
+    console.log('[email] Refund completed email sent to user:', info.messageId);
+    return { success: true };
+  } catch (e) {
+    console.error('[email] Failed to send refund completed email:', e.message);
+    return { success: false, error: e.message };
+  }
+};
+
 module.exports = {
   generateOTP,
   generateUserOTP,
   sendOTPEmail,
   sendUserOTPEmail,
   sendWelcomeEmail,
-  sendUserWelcomeEmail
+  sendUserWelcomeEmail,
+  sendOrderConfirmationToUser,
+  sendNewOrderToSeller,
+  sendCancellationToSeller,
+  sendCancellationToUser,
+  sendRefundCompletedToUser,
 };

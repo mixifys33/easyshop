@@ -1513,4 +1513,69 @@ router.delete('/admin/clear-all', async (req, res) => {
   }
 });
 
+// ── GET seller payment settings ──────────────────────────────────────────
+router.get('/payment/:sellerId', async (req, res) => {
+  try {
+    const seller = await Seller.findById(req.params.sellerId).select('payment');
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+    res.json({ success: true, payment: seller.payment || {} });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── UPDATE seller payment settings + sync to all products ─────────────────
+router.put('/payment/:sellerId', async (req, res) => {
+  try {
+    const { mtnName, mtnNumber, airtelName, airtelNumber, bankName, bankAccountName, bankAccountNumber, bankBranch, preferredMethod } = req.body;
+
+    const update = {};
+    if (mtnName !== undefined) update['payment.mtnName'] = mtnName;
+    if (mtnNumber !== undefined) update['payment.mtnNumber'] = mtnNumber;
+    if (airtelName !== undefined) update['payment.airtelName'] = airtelName;
+    if (airtelNumber !== undefined) update['payment.airtelNumber'] = airtelNumber;
+    if (bankName !== undefined) update['payment.bankName'] = bankName;
+    if (bankAccountName !== undefined) update['payment.bankAccountName'] = bankAccountName;
+    if (bankAccountNumber !== undefined) update['payment.bankAccountNumber'] = bankAccountNumber;
+    if (bankBranch !== undefined) update['payment.bankBranch'] = bankBranch;
+    if (preferredMethod !== undefined) update['payment.preferredMethod'] = preferredMethod;
+
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.sellerId,
+      { $set: update },
+      { new: true }
+    ).select('payment');
+
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+
+    // Sync payment methods to ALL seller's products
+    const Product = require('../models/Product');
+    const paymentSync = {
+      'paymentMethods.mtnName': mtnName || '',
+      'paymentMethods.mtnNumber': mtnNumber || '',
+      'paymentMethods.airtelName': airtelName || '',
+      'paymentMethods.airtelNumber': airtelNumber || '',
+      'paymentMethods.bankName': bankName || '',
+      'paymentMethods.bankAccountName': bankAccountName || '',
+      'paymentMethods.bankAccountNumber': bankAccountNumber || '',
+      'paymentMethods.bankBranch': bankBranch || '',
+      'paymentMethods.preferredMethod': preferredMethod || '',
+    };
+
+    const syncResult = await Product.updateMany(
+      { sellerId: req.params.sellerId },
+      { $set: paymentSync }
+    );
+
+    res.json({
+      success: true,
+      payment: seller.payment,
+      productsUpdated: syncResult.modifiedCount,
+    });
+  } catch (err) {
+    console.error('PUT payment error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

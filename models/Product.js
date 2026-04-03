@@ -139,6 +139,19 @@ const productSchema = new mongoose.Schema({
     default: 'Yes'
   },
 
+  // Payment methods inherited from seller (auto-synced)
+  paymentMethods: {
+    mtnNumber: { type: String, default: '' },
+    mtnName: { type: String, default: '' },
+    airtelNumber: { type: String, default: '' },
+    airtelName: { type: String, default: '' },
+    bankName: { type: String, default: '' },
+    bankAccountName: { type: String, default: '' },
+    bankAccountNumber: { type: String, default: '' },
+    bankBranch: { type: String, default: '' },
+    preferredMethod: { type: String, default: '' },
+  },
+
   // Delivery
   deliveryTerminals: [{
     type: mongoose.Schema.Types.ObjectId,
