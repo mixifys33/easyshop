@@ -535,9 +535,9 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
                 </div>
                 
                 ${isPasswordReset ? `
-                <p>We received a request to reset your password for your AllOutGadgets seller account. Use the verification code below to proceed with resetting your password.</p>
+                <p>We received a request to reset your password for your EasyShop seller account. Use the verification code below to proceed with resetting your password.</p>
                 ` : `
-                <p>Welcome to <strong>AllOutGadgets</strong> - where businesses become profitable realities! We're thrilled that you've chosen to start your entrepreneurial journey with us.</p>
+                <p>Welcome to <strong>EasyShop</strong> - where businesses become profitable realities! We're thrilled that you've chosen to start your entrepreneurial journey with us.</p>
                 `}
                 
                 <div class="otp-section">
@@ -581,11 +581,11 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
             </div>
             
             <div class="footer">
-                <p><strong>AllOutGadgets</strong> - Empowering Entrepreneurs</p>
-                <p>📧 support@alloutgadgets.com | 📞 +256761819885</p>
+                <p><strong>EasyShop</strong> - Empowering Entrepreneurs</p>
+                <p>📧 support@easyshop.com | 📞 +256761819885</p>
                
                 <p style="margin-top: 20px; font-size: 12px; opacity: 0.6;">
-                    © 2024 AllOutGadgets. All rights reserved.<br>
+                    © 2024 EasyShop. All rights reserved.<br>
                     This email was sent to ${email}
                 </p>
             </div>
@@ -596,20 +596,20 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
 
   const mailOptions = {
     from: {
-      name: 'AllOutGadgets',
+      name: 'EasyShop',
       address: process.env.SMTP_USER
     },
     to: email,
     subject: isPasswordReset ? 
-      '🔐 Reset Your AllOutGadgets Password - Secure Access Code' : 
-      '🔐 Verify Your AllOutGadgets Seller Account - Your Success Journey Begins!',
+      '🔐 Reset Your EasyShop Password - Secure Access Code' : 
+      '🔐 Verify Your EasyShop Seller Account - Your Success Journey Begins!',
     html: htmlTemplate,
     text: `
 Hello ${name || (isPasswordReset ? 'Valued Seller' : 'Future Entrepreneur')}!
 
 ${isPasswordReset ? 
-  `We received a request to reset your password for your AllOutGadgets seller account.` :
-  `Welcome to AllOutGadgets! `
+  `We received a request to reset your password for your EasyShop seller account.` :
+  `Welcome to EasyShop! `
 }
 
 Your ${isPasswordReset ? 'password reset' : 'verification'} code is: ${otp}
@@ -634,7 +634,7 @@ What awaits you:
 Need help? Contact us by replying to the email. 
 
 Best regards,
-The AllOutGadgets Team
+The EasyShop Team
     `
   };
 
@@ -775,13 +775,13 @@ const sendWelcomeEmail = async (email, name) => {
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎉 Welcome to AllOutGadgets!</h1>
+                <h1>🎉 Welcome to EasyShop!</h1>
                 <p>Your seller account is now active</p>
             </div>
             
             <div class="content">
                 <h2>Congratulations, ${name}! 🚀</h2>
-                <p>Your seller account has been successfully verified and activated. You're now part of the AllOutGadgets family!</p>
+                <p>Your seller account has been successfully verified and activated. You're now part of the EasyShop family!</p>
                 
                 <div class="success-badge">
                     <h3>✅ Account Verified Successfully</h3>
@@ -814,7 +814,7 @@ const sendWelcomeEmail = async (email, name) => {
             <div class="footer">
                 <p><strong>Ready to start your success story?</strong></p>
                 <p>Login to your seller dashboard and begin your journey!</p>
-                <p style="margin-top: 20px;">📧 support@alloutgadgets.com | 📞 +256761819885</p>
+                <p style="margin-top: 20px;">📧 support@easyshop.com | 📞 +256761819885</p>
             </div>
         </div>
     </body>
@@ -823,11 +823,11 @@ const sendWelcomeEmail = async (email, name) => {
 
   const mailOptions = {
     from: {
-      name: 'AllOut Gadgets',
+      name: 'EasyShop',
       address: process.env.SMTP_USER
     },
     to: email,
-    subject: '🎉 Welcome to AllOut Gadgets - Your Success Journey Begins Now!',
+    subject: '🎉 Welcome to EasyShop - Your Success Journey Begins Now!',
     html: htmlTemplate
   };
 

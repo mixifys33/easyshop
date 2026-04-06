@@ -5,7 +5,57 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Product = require('../models/Product');
+const Campaign = require('../models/Campaign');
 const router = express.Router();
+
+// Helper: attach active campaign info to a product object
+const attachCampaign = (product, campaigns) => {
+  const pid = product._id?.toString();
+  const cat = product.category;
+  // After populate, sellerId is an object — always extract _id
+  const sid = (product.sellerId?._id || product.sellerId)?.toString();
+
+  const match = campaigns.find(c => {
+    if (c.sellerId?.toString() !== sid) return false;
+    // status already filtered to 'active' in query, but double-check
+    if (c.status !== 'active') return false;
+    if (c.appliesTo === 'all_products') return true;
+    if (c.appliesTo === 'specific_categories') return c.categories?.includes(cat);
+    if (c.appliesTo === 'specific_products')
+      return c.productIds?.map(id => id.toString()).includes(pid);
+    return false;
+  });
+
+  if (!match) return product;
+
+  const basePrice = product.salePrice || 0;
+  let campaignPrice = basePrice;
+  if (match.type !== 'free_shipping') {
+    if (match.discountType === 'percentage') {
+      campaignPrice = basePrice - (basePrice * match.discountValue / 100);
+    } else {
+      campaignPrice = basePrice - match.discountValue;
+    }
+    campaignPrice = Math.max(0, Math.round(campaignPrice));
+  }
+
+  const plain = product.toObject ? product.toObject() : { ...product };
+  return {
+    ...plain,
+    campaign: {
+      id:            match._id,
+      title:         match.title,
+      type:          match.type,
+      discountType:  match.discountType,
+      discountValue: match.discountValue,
+      couponCode:    match.couponCode || null,
+      bannerColor:   match.bannerColor,
+      endDate:       match.endDate,
+    },
+    campaignPrice,
+    hasCampaign: true,
+  };
+};
 
 // Configure multer for file uploads
 const upload = multer({
@@ -33,27 +83,37 @@ router.get('/', async (req, res) => {
   try {
     const { category, subCategory, sellerId, status = 'active' } = req.query;
     const filter = { status };
-    
-    if (category) filter.category = category;
+    if (category)    filter.category = category;
     if (subCategory) filter.subCategory = subCategory;
-    if (sellerId) filter.sellerId = sellerId;
+    if (sellerId)    filter.sellerId = sellerId;
 
     const products = await Product.find(filter)
       .populate('sellerId', 'shop.shopName email phoneNumber verified')
       .sort({ createdAt: -1 });
-    
-    res.json({
-      success: true,
-      products,
-      count: products.length
-    });
+
+    // Fetch all active campaigns once
+    const now = new Date();
+    const campaigns = await Campaign.find({ status: 'active', startDate: { $lte: now }, endDate: { $gte: now } });
+
+    const enriched = products.map(p => attachCampaign(p, campaigns));
+
+    res.json({ success: true, products: enriched, count: enriched.length });
   } catch (error) {
     console.error('Error fetching products:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to fetch products',
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch products', error: error.message });
+  }
+});
+
+// Get latest product updatedAt timestamp (used by frontend cache invalidation)
+router.get('/latest-update', async (req, res) => {
+  try {
+    const latest = await Product.findOne({ status: 'active' })
+      .sort({ updatedAt: -1 })
+      .select('updatedAt')
+      .lean();
+    res.json({ success: true, lastUpdated: latest?.updatedAt || null });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to get latest update', error: error.message });
   }
 });
 
@@ -82,25 +142,19 @@ router.get('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('sellerId', 'shop.shopName email phoneNumber verified');
-    
-    if (!product) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Product not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      product
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const now = new Date();
+    const campaigns = await Campaign.find({
+      sellerId: product.sellerId?._id || product.sellerId,
+      status: 'active', startDate: { $lte: now }, endDate: { $gte: now },
     });
+    const enriched = attachCampaign(product, campaigns);
+
+    res.json({ success: true, product: enriched });
   } catch (error) {
     console.error('Error fetching product:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to fetch product',
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch product', error: error.message });
   }
 });
 

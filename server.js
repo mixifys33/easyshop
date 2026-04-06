@@ -15,6 +15,7 @@ const deliveryRoutes = require('./routes/delivery');
 const orderRoutes = require('./routes/orders');
 const paymentVerifyRoutes = require('./routes/paymentVerify');
 const shopAIRoutes = require('./routes/shopAI');
+const campaignRoutes = require('./routes/campaigns');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +40,7 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment-verify', paymentVerifyRoutes);
 app.use('/api/shop-ai', shopAIRoutes);
+app.use('/api/campaigns', campaignRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Backend server is running with database!' });

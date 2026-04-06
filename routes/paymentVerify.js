@@ -110,8 +110,8 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://alloutgadgets.com',
-            'X-Title': 'AllOutGadgets Payment Verification',
+            'HTTP-Referer': 'https://easyshop.com',
+            'X-Title': 'EasyShop Payment Verification',
           },
           body: JSON.stringify({ model, messages, max_tokens: 800, temperature: 0.1 }),
         });

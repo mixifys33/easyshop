@@ -73,7 +73,7 @@ const formatRelatedProducts = (products) => {
     const price = p.salePrice
       ? `UGX ${Number(p.salePrice).toLocaleString()}`
       : `UGX ${Number(p.regularPrice).toLocaleString()}`;
-    const shop = p.sellerId?.shopName || 'AllOutGadgets';
+    const shop = p.sellerId?.shopName || 'EasyShop';
     const verified = p.sellerId?.verified ? ' (Verified)' : '';
     const desc = p.description ? p.description.slice(0, 100) : '';
     return `${i + 1}. ${p.title} — ${price} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock > 0 ? p.stock + ' units' : 'Out of stock'} | Shop: ${shop}${verified}\n   ${desc}`;
@@ -92,7 +92,7 @@ const buildSystemPrompt = (product, relatedProducts = []) => {
     ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options — use ONLY the products listed above. Never invent or mention products not listed here.\n`
     : '';
 
-  return `You are a helpful AI shopping assistant for EasyShop / AllOutGadgets (ADO — Advanced Developtilasied Optimatic AI), an e-commerce store in Uganda.
+  return `You are a helpful AI shopping assistant for EasyShop called ADO — Advanced Developtilasied Optimatic AI, an e-commerce store in Uganda.
 Do not recommend other stores or platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
 
 CURRENT PRODUCT:
@@ -103,7 +103,7 @@ CURRENT PRODUCT:
 - Brand: ${product.brand || 'N/A'}
 - Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Out of stock'}
 - Description: ${product.description || 'No description available'}
-- Seller/Shop: ${product.seller?.name || 'AllOutGadgets Store'}
+- Seller/Shop: ${product.seller?.name || 'EasyShop Store'}
 - Seller Verified: ${product.seller?.verified ? 'Yes' : 'No'}
 - Cash on Delivery: ${product.cashOnDelivery || 'Available'}
 - Currency: UGX (Ugandan Shillings)
@@ -169,8 +169,8 @@ router.post('/chat', async (req, res) => {
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://alloutgadgets.com',
-            'X-Title': 'AllOutGadgets AI Assistant',
+            'HTTP-Referer': 'https://easyshop.com',
+            'X-Title': 'EasyShop AI Assistant',
           },
           body: JSON.stringify({
             model,

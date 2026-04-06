@@ -168,7 +168,7 @@ router.post('/verify-otp', async (req, res) => {
     const token = jwt.sign(
       { userId: savedUser._id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     res.status(200).json({
@@ -299,7 +299,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     res.json({
@@ -631,11 +631,11 @@ router.put('/profile', async (req, res) => {
 
   } catch (error) {
     console.error('Profile update error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Session expired', error: 'Please login again' });
+    }
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        message: 'Invalid token',
-        error: 'Please login again'
-      });
+      return res.status(401).json({ message: 'Invalid token', error: 'Please login again' });
     }
     res.status(500).json({
       message: 'Internal server error',
@@ -717,16 +717,43 @@ router.post('/change-password', async (req, res) => {
 
   } catch (error) {
     console.error('Change password error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Session expired', error: 'Please login again' });
+    }
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        message: 'Invalid token',
-        error: 'Please login again'
-      });
+      return res.status(401).json({ message: 'Invalid token', error: 'Please login again' });
     }
     res.status(500).json({
       message: 'Internal server error',
       error: 'Something went wrong. Please try again.'
     });
+  }
+});
+
+// Refresh token — call this when a 401 is received to get a new token silently
+router.post('/refresh-token', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    // Verify with ignoreExpiration so we can still read the userId from an expired token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+
+    // Make sure the user still exists
+    const user = await User.findById(decoded.userId).select('_id name email role');
+    if (!user) return res.status(401).json({ message: 'User not found' });
+
+    // Issue a fresh 30-day token
+    const newToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({
+      success: true,
+      token: newToken,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error.message);
+    res.status(401).json({ message: 'Could not refresh token', error: 'Please login again' });
   }
 });
 
