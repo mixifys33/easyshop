@@ -79,25 +79,88 @@ const upload = multer({
 });
 
 // Get all products (public)
+// Helper: normalize a product document to the shape the frontend card expects
+const normalizeProduct = (p) => {
+  const obj = p.toObject ? p.toObject() : { ...p };
+  const seller = obj.sellerId;
+  return {
+    ...obj,
+    id: obj._id?.toString(),
+    sale_price: obj.salePrice,
+    regular_price: obj.regularPrice,
+    Shop: {
+      id: seller?._id?.toString() || '',
+      name: seller?.shop?.shopName || seller?.shopName || '',
+    },
+    // keep originals too for compatibility
+    salePrice: obj.salePrice,
+    regularPrice: obj.regularPrice,
+  };
+};
+
 router.get('/', async (req, res) => {
   try {
-    const { category, subCategory, sellerId, status = 'active' } = req.query;
+    const {
+      category, subCategory, sellerId, status = 'active',
+      q, brand, colors, sizes,
+      price_gte, price_lte, rating_gte,
+      sortBy = 'createdAt', sortOrder = 'desc',
+      page = 1, limit = 12,
+    } = req.query;
+
     const filter = { status };
     if (category)    filter.category = category;
     if (subCategory) filter.subCategory = subCategory;
     if (sellerId)    filter.sellerId = sellerId;
+    if (brand)       filter.brand = { $regex: brand, $options: 'i' };
+    if (colors)      filter.colors = { $in: colors.split(',') };
+    if (sizes)       filter.sizes = { $in: sizes.split(',') };
+    if (price_gte || price_lte) {
+      filter.salePrice = {};
+      if (price_gte) filter.salePrice.$gte = Number(price_gte);
+      if (price_lte) filter.salePrice.$lte = Number(price_lte);
+    }
+    if (q) {
+      filter.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { tags: { $regex: q, $options: 'i' } },
+        { brand: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const sortMap = {
+      price: 'salePrice', createdAt: 'createdAt',
+      title: 'title', stock: 'stock',
+    };
+    const sortField = sortMap[sortBy] || 'createdAt';
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await Product.countDocuments(filter);
 
     const products = await Product.find(filter)
-      .populate('sellerId', 'shop.shopName email phoneNumber verified')
-      .sort({ createdAt: -1 });
+      .populate('sellerId', 'shop.shopName shopName email phoneNumber verified')
+      .sort({ [sortField]: sortDir })
+      .skip(skip)
+      .limit(Number(limit));
 
-    // Fetch all active campaigns once
     const now = new Date();
     const campaigns = await Campaign.find({ status: 'active', startDate: { $lte: now }, endDate: { $gte: now } });
 
-    const enriched = products.map(p => attachCampaign(p, campaigns));
+    const enriched = products.map(p => {
+      const withCampaign = attachCampaign(p, campaigns);
+      return normalizeProduct(withCampaign);
+    });
 
-    res.json({ success: true, products: enriched, count: enriched.length });
+    res.json({
+      success: true,
+      products: enriched,
+      count: enriched.length,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch products', error: error.message });
@@ -117,23 +180,64 @@ router.get('/latest-update', async (req, res) => {
   }
 });
 
-// Get categories for bulk edit
+// Get categories (with subCategories grouped)
 router.get('/categories', async (req, res) => {
   try {
-    // Get unique categories from products
-    const categories = await Product.distinct('category');
-    
-    res.json({
-      success: true,
-      categories: categories.filter(cat => cat) // Remove null/undefined values
+    const categories = await Product.distinct('category', { status: 'active' });
+    const subCategoryDocs = await Product.aggregate([
+      { $match: { status: 'active' } },
+      { $group: { _id: { category: '$category', subCategory: '$subCategory' } } },
+    ]);
+
+    const subCategories = {};
+    subCategoryDocs.forEach(({ _id }) => {
+      if (!_id.category) return;
+      if (!subCategories[_id.category]) subCategories[_id.category] = [];
+      if (_id.subCategory) subCategories[_id.category].push(_id.subCategory);
     });
+
+    res.json({ success: true, categories: categories.filter(Boolean), subCategories });
   } catch (error) {
     console.error('Error fetching categories:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch categories',
-      error: error.message
+    res.status(500).json({ success: false, message: 'Failed to fetch categories', error: error.message });
+  }
+});
+
+// GET /api/products/recommendations — must be before /:id
+router.get('/recommendations', async (req, res) => {
+  try {
+    const { categories, excludeIds, limit = 8 } = req.query;
+    const filter = { status: 'active', isDraft: { $ne: true } };
+
+    if (categories) {
+      filter.category = { $in: categories.split(',').map(c => c.trim()).filter(Boolean) };
+    }
+    if (excludeIds) {
+      const ids = excludeIds.split(',').map(id => id.trim()).filter(id => id.match(/^[a-f\d]{24}$/i));
+      if (ids.length) filter._id = { $nin: ids };
+    }
+
+    const products = await Product.find(filter)
+      .select('title slug salePrice regularPrice images category ratings _id')
+      .sort({ ratings: -1, createdAt: -1 })
+      .limit(Math.min(parseInt(limit) || 8, 20))
+      .lean();
+
+    res.json({
+      success: true,
+      products: products.map(p => ({
+        id: p._id,
+        title: p.title,
+        slug: p.slug || p._id,
+        sale_price: p.salePrice || 0,
+        regular_price: p.regularPrice || 0,
+        images: p.images || [],
+        category: p.category || '',
+        ratings: p.ratings || 0,
+      })),
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -141,7 +245,7 @@ router.get('/categories', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('sellerId', 'shop.shopName email phoneNumber verified');
+      .populate('sellerId', 'shop.shopName shopName email phoneNumber verified');
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
     const now = new Date();
@@ -149,7 +253,7 @@ router.get('/:id', async (req, res) => {
       sellerId: product.sellerId?._id || product.sellerId,
       status: 'active', startDate: { $lte: now }, endDate: { $gte: now },
     });
-    const enriched = attachCampaign(product, campaigns);
+    const enriched = normalizeProduct(attachCampaign(product, campaigns));
 
     res.json({ success: true, product: enriched });
   } catch (error) {

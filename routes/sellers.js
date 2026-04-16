@@ -189,7 +189,7 @@ const validatePassword = (password) => {
 // Seller registration endpoint
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, phoneNumber, password } = req.body;
+    const { name, email, phoneNumber, password, applicationNote } = req.body;
     
     // Validate required fields
     if (!name || !email || !phoneNumber || !password) {
@@ -251,7 +251,7 @@ router.post('/register', async (req, res) => {
       otp: otp,
       expires: Date.now() + 10 * 60 * 1000, // 10 minutes
       attempts: 0,
-      sellerData: { name, email, phoneNumber, password } // Store plain password, will be hashed when saving to DB
+      sellerData: { name, email, phoneNumber, password, applicationNote: applicationNote || '' } // Store plain password, will be hashed when saving to DB
     });
     
     console.log('OTP stored for email:', email, 'OTP:', otp);
@@ -378,7 +378,9 @@ router.post('/verify', async (req, res) => {
       phoneNumber: storedData.sellerData.phoneNumber,
       password: storedData.sellerData.password, // Will be hashed by pre-save middleware
       verified: true,
-      status: 'active'
+      status: 'pending',           // Requires admin approval before they can sell
+      approvalStatus: 'pending_review',
+      applicationNote: storedData.sellerData.applicationNote || '',
     });
     
     // Save seller to database
@@ -563,6 +565,22 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         message: 'Account not verified',
         error: 'Please verify your email address first'
+      });
+    }
+
+    // Check approval status
+    if (seller.approvalStatus === 'pending_review') {
+      return res.status(403).json({
+        message: 'Application under review',
+        error: 'Your seller application is being reviewed. We will notify you once approved.',
+        approvalStatus: 'pending_review'
+      });
+    }
+    if (seller.approvalStatus === 'rejected') {
+      return res.status(403).json({
+        message: 'Application rejected',
+        error: seller.approvalRejectionReason || 'Your seller application was not approved.',
+        approvalStatus: 'rejected'
       });
     }
     
@@ -1418,6 +1436,70 @@ router.get('/shop/:sellerId', async (req, res) => {
   }
 });
 
+// ── Admin: list pending sellers awaiting approval ──────────────────────────
+router.get('/admin/pending', async (req, res) => {
+  try {
+    const sellers = await Seller.find(
+      { approvalStatus: 'pending_review' },
+      'name email phoneNumber applicationNote createdAt shop'
+    ).sort({ createdAt: 1 }).lean();
+    res.json({ success: true, sellers });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Admin: approve a seller ────────────────────────────────────────────────
+router.patch('/admin/:id/approve', async (req, res) => {
+  try {
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      {
+        approvalStatus: 'approved',
+        status: 'active',
+        approvedAt: new Date(),
+        approvedBy: req.body.adminId || 'admin',
+        approvalRejectionReason: '',
+      },
+      { new: true }
+    );
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+
+    // Send approval email
+    try {
+      const { sendWelcomeEmail } = require('../services/emailService');
+      await sendWelcomeEmail(seller.email, seller.name);
+    } catch (_) {}
+
+    res.json({ success: true, message: 'Seller approved', seller });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Admin: reject a seller ─────────────────────────────────────────────────
+router.patch('/admin/:id/reject', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason) return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      {
+        approvalStatus: 'rejected',
+        status: 'banned',
+        approvalRejectionReason: reason,
+      },
+      { new: true }
+    );
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+
+    res.json({ success: true, message: 'Seller rejected', seller });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Admin endpoint to check seller accounts (for development/testing)
 router.get('/admin/sellers', async (req, res) => {
   try {
@@ -1574,6 +1656,231 @@ router.put('/payment/:sellerId', async (req, res) => {
     });
   } catch (err) {
     console.error('PUT payment error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/sellers/public — public shop listing (used by /shops page) ──────
+// Also handles GET / when mounted at /api/shops
+router.get(['/', '/public'], async (req, res) => {
+  try {
+    const { category, minRating, sort, search, limit = 12, cursor } = req.query;
+    const Product = require('../models/Product');
+
+    // Only show sellers who have completed shop setup
+    const filter = { 'shop.isSetup': true };
+
+    if (category && category !== 'All Categories') {
+      filter['shop.businessType'] = new RegExp(category, 'i');
+    }
+
+    if (search) {
+      filter.$or = [
+        { 'shop.shopName': new RegExp(search, 'i') },
+        { 'shop.shopDescription': new RegExp(search, 'i') },
+        { 'shop.city': new RegExp(search, 'i') },
+      ];
+    }
+
+    // Cursor-based pagination
+    if (cursor) {
+      filter._id = { $gt: cursor };
+    }
+
+    let sortObj = { createdAt: -1 };
+    if (sort === 'rating') sortObj = { 'metrics.rating': -1 };
+    else if (sort === 'name_asc') sortObj = { 'shop.shopName': 1 };
+    else if (sort === 'newest') sortObj = { createdAt: -1 };
+
+    const lim = Math.min(parseInt(limit) || 12, 50);
+
+    const sellers = await Seller.find(filter)
+      .select('_id name verified createdAt shop metrics profileImage')
+      .sort(sortObj)
+      .limit(lim + 1)
+      .lean();
+
+    const hasMore = sellers.length > lim;
+    const page = sellers.slice(0, lim);
+
+    // Get product counts per seller using ObjectId matching
+    const sellerObjectIds = page.map(s => s._id);
+    const productCounts = await Product.aggregate([
+      { $match: { sellerId: { $in: sellerObjectIds }, status: 'active', isDraft: { $ne: true } } },
+      { $group: { _id: '$sellerId', count: { $sum: 1 } } },
+    ]);
+    const countMap = {};
+    productCounts.forEach(p => { countMap[p._id.toString()] = p.count; });
+
+    const shops = page.map(s => ({
+      id: s._id,
+      name: s.shop.shopName || s.name,
+      bio: s.shop.shopDescription || '',
+      category: s.shop.businessType || 'General',
+      address: [s.shop.city, 'Uganda'].filter(Boolean).join(', '),
+      ratings: s.metrics?.rating || (s.verified ? 5 : 0),
+      reviewCount: s.metrics?.reviewCount || 0,
+      productCount: countMap[s._id.toString()] || 0,
+      // avatar: seller profile image first, then shop logo, then thumbnail
+      avatar: s.profileImage?.url || (typeof s.profileImage === 'string' && s.profileImage ? s.profileImage : null) || s.shop?.logo?.url || s.shop?.logo?.thumbnailUrl || null,
+      // coverBanner: shop banner image
+      coverBanner: s.shop?.banner?.url || s.shop?.banner?.thumbnailUrl || null,
+      isVerified: s.verified || false,
+      createdAt: s.createdAt,
+    }));
+
+    // Apply minRating filter after aggregation (since rating is in metrics)
+    const filtered = minRating
+      ? shops.filter(s => s.ratings >= parseFloat(minRating))
+      : shops;
+
+    res.json({
+      success: true,
+      shops: filtered,
+      hasMore,
+      nextCursor: hasMore ? page[page.length - 1]._id : null,
+      total: filtered.length,
+    });
+  } catch (err) {
+    console.error('[shops/public]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/sellers/detail/:sellerId — full shop detail page data ────────────
+// Also handles GET /:id when mounted at /api/shops
+router.get(['/detail/:sellerId', '/:sellerId'], async (req, res) => {
+  // Skip if this looks like a known sub-path handled elsewhere
+  const skip = ['public', 'admin', 'debug', 'profile', 'shop', 'payment', 'register', 'login', 'verify', 'resend-otp', 'forgot-password-seller', 'verify-forgot-password-seller', 'reset-password-seller', 'validate-credentials'];
+  if (skip.includes(req.params.sellerId)) return res.status(404).json({ success: false, message: 'Not found' });
+  try {
+    const Product = require('../models/Product');
+    const { sellerId } = req.params;
+    const { sort = 'newest', limit = 12, cursor } = req.query;
+
+    const seller = await Seller.findById(sellerId)
+      .select('_id name verified createdAt shop metrics profileImage')
+      .lean();
+
+    if (!seller || !seller.shop?.isSetup) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+
+    // Build product query
+    const productFilter = {
+      sellerId: sellerId,
+      status: 'active',
+      isDraft: { $ne: true },
+    };
+    if (cursor) productFilter._id = { $gt: cursor };
+
+    let sortObj = { createdAt: -1 };
+    if (sort === 'price_asc') sortObj = { salePrice: 1 };
+    else if (sort === 'price_desc') sortObj = { salePrice: -1 };
+    else if (sort === 'rating') sortObj = { ratings: -1 };
+
+    const lim = Math.min(parseInt(limit) || 12, 50);
+    const products = await Product.find(productFilter)
+      .select('title salePrice regularPrice images category subCategory brand stock ratings slug _id')
+      .sort(sortObj)
+      .limit(lim + 1)
+      .lean();
+
+    const hasMore = products.length > lim;
+    const productPage = products.slice(0, lim).map(p => ({
+      id: p._id,
+      title: p.title,
+      slug: p.slug,
+      sale_price: p.salePrice,
+      regular_price: p.regularPrice,
+      images: p.images || [],
+      category: p.category,
+      subCategory: p.subCategory,
+      brand: p.brand,
+      stock: p.stock,
+      ratings: p.ratings || 0,
+    }));
+
+    // Other shops from same city (up to 4)
+    const otherSellers = await Seller.find({
+      _id: { $ne: sellerId },
+      'shop.isSetup': true,
+      'shop.city': seller.shop.city,
+    }).select('_id name shop profileImage verified metrics').limit(4).lean();
+
+    const otherShops = otherSellers.map(s => ({
+      id: s._id,
+      name: s.shop.shopName || s.name,
+      category: s.shop.businessType || '',
+      avatar: s.profileImage?.url || s.profileImage || s.shop?.logo?.url || null,
+      ratings: s.metrics?.rating || (s.verified ? 5 : 0),
+      isVerified: s.verified || false,
+    }));
+
+    const shop = {
+      id: seller._id,
+      name: seller.shop.shopName || seller.name,
+      bio: seller.shop.shopDescription || '',
+      category: seller.shop.businessType || 'General',
+      address: [seller.shop.businessAddress, seller.shop.city, 'Uganda'].filter(Boolean).join(', '),
+      city: seller.shop.city || '',
+      website: seller.shop.website || '',
+      ratings: seller.metrics?.rating || (seller.verified ? 5 : 0),
+      reviewCount: seller.metrics?.reviewCount || 0,
+      productCount: productPage.length,
+      avatar: seller.profileImage?.url || seller.profileImage || seller.shop?.logo?.url || null,
+      coverBanner: seller.shop?.banner?.url || null,
+      isVerified: seller.verified || false,
+      createdAt: seller.createdAt,
+    };
+
+    res.json({
+      success: true,
+      shop,
+      products: productPage,
+      otherShops,
+      nextProductCursor: hasMore ? productPage[productPage.length - 1]?.id : null,
+      hasMoreProducts: hasMore,
+    });
+  } catch (err) {
+    console.error('[shop/detail]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/sellers/detail/:sellerId/products — paginated products ───────────
+// Also handles GET /:id/products when mounted at /api/shops
+router.get(['/detail/:sellerId/products', '/:sellerId/products'], async (req, res) => {
+  try {
+    const Product = require('../models/Product');
+    const { sellerId } = req.params;
+    const { sort = 'newest', limit = 12, cursor } = req.query;
+
+    const filter = { sellerId, status: 'active', isDraft: { $ne: true } };
+    if (cursor) filter._id = { $gt: cursor };
+
+    let sortObj = { createdAt: -1 };
+    if (sort === 'price_asc') sortObj = { salePrice: 1 };
+    else if (sort === 'price_desc') sortObj = { salePrice: -1 };
+    else if (sort === 'rating') sortObj = { ratings: -1 };
+
+    const lim = Math.min(parseInt(limit) || 12, 50);
+    const products = await Product.find(filter)
+      .select('title salePrice regularPrice images category subCategory brand stock ratings slug _id')
+      .sort(sortObj)
+      .limit(lim + 1)
+      .lean();
+
+    const hasMore = products.length > lim;
+    const page = products.slice(0, lim).map(p => ({
+      id: p._id, title: p.title, slug: p.slug,
+      sale_price: p.salePrice, regular_price: p.regularPrice,
+      images: p.images || [], category: p.category,
+      brand: p.brand, stock: p.stock, ratings: p.ratings || 0,
+    }));
+
+    res.json({ success: true, products: page, hasMore, nextCursor: hasMore ? page[page.length - 1]?.id : null });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });

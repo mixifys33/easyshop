@@ -135,6 +135,25 @@ const sellerSchema = new mongoose.Schema({
     cashOnDelivery: { type: Boolean, default: true },
   },
 
+  // Seller application / approval
+  applicationNote: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['pending_review', 'approved', 'rejected'],
+    default: 'pending_review'
+  },
+  approvalRejectionReason: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  approvedAt: { type: Date },
+  approvedBy: { type: String, trim: true }, // admin identifier
+
   // Account status
   status: {
     type: String,

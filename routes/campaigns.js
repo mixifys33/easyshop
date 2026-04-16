@@ -63,6 +63,85 @@ router.post('/', async (req, res) => {
   }
 });
 
+// GET /active — public endpoint for the offers page (must be before /:id)
+router.get('/active', async (req, res) => {
+  try {
+    const now = new Date();
+    const Product = require('../models/Product');
+    const Seller  = require('../models/Seller');
+
+    const campaigns = await Campaign.find({
+      status: 'active',
+      startDate: { $lte: now },
+      endDate:   { $gte: now },
+    }).sort({ createdAt: -1 }).lean();
+
+    const enriched = await Promise.all(campaigns.map(async (c) => {
+      let products = [];
+      if (c.appliesTo === 'specific_products' && c.productIds?.length) {
+        products = await Product.find({ _id: { $in: c.productIds }, status: 'active', isDraft: { $ne: true } })
+          .select('title slug salePrice regularPrice images category brand stock ratings _id')
+          .lean();
+      } else if (c.appliesTo === 'specific_categories' && c.categories?.length) {
+        products = await Product.find({ category: { $in: c.categories }, status: 'active', isDraft: { $ne: true } })
+          .select('title slug salePrice regularPrice images category brand stock ratings _id')
+          .limit(12).lean();
+      } else {
+        products = await Product.find({ sellerId: c.sellerId, status: 'active', isDraft: { $ne: true } })
+          .select('title slug salePrice regularPrice images category brand stock ratings _id')
+          .limit(12).lean();
+      }
+
+      const mappedProducts = products.map(p => {
+        const base = p.salePrice || p.regularPrice || 0;
+        let discounted = base;
+        if (c.discountType === 'percentage') discounted = Math.round(base * (1 - c.discountValue / 100));
+        else if (c.discountType === 'fixed')  discounted = Math.max(0, base - c.discountValue);
+        return {
+          id: p._id,
+          title: p.title,
+          slug: p.slug || p._id,
+          sale_price: base,
+          regular_price: p.regularPrice || base,
+          discounted_price: discounted,
+          image: p.images?.[0]?.url || null,
+          category: p.category,
+          brand: p.brand,
+          stock: p.stock,
+          ratings: p.ratings || 0,
+          savings: base - discounted,
+        };
+      });
+
+      const seller = await Seller.findById(c.sellerId).select('shop.shopName shop.logo profileImage').lean();
+
+      return {
+        id: c._id,
+        title: c.title,
+        description: c.description,
+        type: c.type,
+        discountType: c.discountType,
+        discountValue: c.discountValue,
+        minOrderAmount: c.minOrderAmount,
+        couponCode: c.couponCode,
+        bannerColor: c.bannerColor || '#e74c3c',
+        startDate: c.startDate,
+        endDate: c.endDate,
+        appliesTo: c.appliesTo,
+        products: mappedProducts,
+        shopName: seller?.shop?.shopName || 'EasyShop',
+        shopAvatar: seller?.profileImage?.url || seller?.shop?.logo?.url || null,
+        productCount: mappedProducts.length,
+      };
+    }));
+
+    res.json({ success: true, campaigns: enriched, total: enriched.length });
+  } catch (err) {
+    console.error('[campaigns/active]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET single campaign
 router.get('/:id', async (req, res) => {
   try {

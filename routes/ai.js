@@ -6,24 +6,29 @@ const Product = require('../models/Product');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Free models in priority order — first available will be used
+// Free models in priority order — only ones confirmed to support system prompts
 const FREE_MODELS = [
   process.env.OPENROUTER_MODEL,
   'openrouter/auto',
-     'openrouter/polaris-alpha',
-     'openrouter/hunter-alpha',
-     'openrouter/healer-alpha',
-   'google/lyria-3-pro-preview',
-   'qwen/qwen3.6-plus:free',
-   'google/lyria-3-clip-preview',
-   'openrouter/free',
-   'openrouter/bert-nebulon-alpha',
-   'openrouter/sherlock-think-alpha',
-   'google/gemma-3-4b-it:free',
-   'google/gemma-3-12b-it:free',
-   'openrouter/andromeda-alpha',
-  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'openrouter/polaris-alpha',
+  'qwen/qwen3-235b-a22b:free',
+  'mistralai/mistral-7b-instruct:free',
+  'openrouter/free',
 ].filter(Boolean);
+
+// Models that don't support system role
+const NO_SYSTEM_MODELS = [
+  'google/gemma-3-12b-it:free', 'google/gemma-3-4b-it:free', 'google/gemma-2-9b-it:free',
+];
+
+function prepareMessages(messages, model) {
+  if (!NO_SYSTEM_MODELS.includes(model)) return messages;
+  var system = messages.find(function(m) { return m.role === 'system'; });
+  var rest = messages.filter(function(m) { return m.role !== 'system'; });
+  if (!system) return rest;
+  if (rest.length === 0) return [{ role: 'user', content: system.content }];
+  return [{ role: 'user', content: system.content + '\n\n' + rest[0].content }].concat(rest.slice(1));
+}
 
 // Keywords that signal the user wants comparisons / alternatives
 const COMPARISON_KEYWORDS = [
@@ -92,7 +97,7 @@ const buildSystemPrompt = (product, relatedProducts = []) => {
     ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options — use ONLY the products listed above. Never invent or mention products not listed here.\n`
     : '';
 
-  return `You are a helpful AI shopping assistant for EasyShop called ADO — Advanced Developtilasied Optimatic AI, an e-commerce store in Uganda.
+  return `You are a helpful AI shopping assistant for EasyShop called ADO-( Advanced Developtilasied Optimatic AI after your creator Masereka Adorable Kimulya), an e-commerce store in Uganda. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
 Do not recommend other stores or platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
 
 CURRENT PRODUCT:
@@ -174,7 +179,7 @@ router.post('/chat', async (req, res) => {
           },
           body: JSON.stringify({
             model,
-            messages: chatMessages,
+            messages: prepareMessages(chatMessages, model),
             max_tokens: 900,
             temperature: 0.9,
           }),
@@ -188,8 +193,8 @@ router.post('/chat', async (req, res) => {
       console.log(`📡 Response status for ${model}: ${response.status}`);
       const rawText = await response.text();
 
-      if (response.status === 429 || response.status === 503) {
-        console.warn(`Model ${model} rate-limited, trying next...`);
+      if (response.status === 429 || response.status === 503 || response.status === 400 || response.status === 402 || response.status === 404) {
+        console.warn(`Model ${model} returned ${response.status}, trying next...`);
         lastError = rawText;
         continue;
       }

@@ -28,14 +28,38 @@ const orderSchema = new mongoose.Schema({
 const CustomerOrder = mongoose.models.CustomerOrder || mongoose.model('CustomerOrder', orderSchema);
 
 // ── Model fallback chains ─────────────────────────────────────────────────────
+// Only models confirmed to support system prompts and free tier
 const MODELS = [
-  'openrouter/auto', 'openrouter/polaris-alpha',
-  'qwen/qwen3.6-plus:free', 'google/gemma-3-12b-it:free', 'openrouter/free',
+  'openrouter/auto',
+  'openrouter/polaris-alpha',
+  'qwen/qwen3-235b-a22b:free',
+  'mistralai/mistral-7b-instruct:free',
+  'openrouter/free',
 ].filter(Boolean);
 
 const VISION_MODELS = [
-  'openrouter/auto', 'nvidia/nemotron-nano-12b-v2-vl:free', 'google/gemma-3-12b-it:free',
+  'openrouter/auto',
+  'meta-llama/llama-3.2-11b-vision-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'openrouter/free',
 ].filter(Boolean);
+
+// Models known NOT to support system role — we merge system into user message for these
+const NO_SYSTEM_PROMPT_MODELS = [
+  'google/gemma-3-12b-it:free',
+  'google/gemma-3-4b-it:free',
+  'google/gemma-2-9b-it:free',
+];
+
+function prepareMessages(messages, model) {
+  if (!NO_SYSTEM_PROMPT_MODELS.includes(model)) return messages;
+  // Merge system prompt into the first user message
+  var system = messages.find(function(m) { return m.role === 'system'; });
+  var rest = messages.filter(function(m) { return m.role !== 'system'; });
+  if (!system) return rest;
+  if (rest.length === 0) return [{ role: 'user', content: system.content }];
+  return [{ role: 'user', content: system.content + '\n\n' + rest[0].content }].concat(rest.slice(1));
+}
 
 // ── Safe field selectors — no passwords, tokens, payment credentials ──────────
 const PRODUCT_SELECT = 'title regularPrice salePrice category subCategory brand stock description cashOnDelivery images sellerId warranty tags colors sizes customSpecs deliveryFee freeDelivery featured';
@@ -47,6 +71,7 @@ async function callAI(messages, models, maxTokens) {
   var lastError = null;
   for (var i = 0; i < models.length; i++) {
     try {
+      var prepared = prepareMessages(messages, models[i]);
       var res = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
@@ -55,10 +80,14 @@ async function callAI(messages, models, maxTokens) {
           'HTTP-Referer': 'https://easyshop.com',
           'X-Title': 'EasyShop AI',
         },
-        body: JSON.stringify({ model: models[i], messages: messages, max_tokens: maxTokens, temperature: 0.25 }),
+        body: JSON.stringify({ model: models[i], messages: prepared, max_tokens: maxTokens, temperature: 0.25 }),
       });
       var raw = await res.text();
-      if (res.status === 429 || res.status === 503) { lastError = raw; continue; }
+      // Skip rate limits, server errors, and bad requests (e.g. model doesn't support system prompts)
+      if (res.status === 429 || res.status === 503 || res.status === 400 || res.status === 402 || res.status === 404) {
+        lastError = raw;
+        continue;
+      }
       if (!res.ok) { lastError = raw; continue; }
       var data = JSON.parse(raw);
       var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
@@ -464,19 +493,18 @@ async function buildSystemContext(messages, userId) {
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 var BASE_SYSTEM_PROMPT = `You are EasyShop AI — the built-in shopping assistant for EasyShop Uganda.
-You ONLY know about EasyShop Uganda. You have ZERO knowledge of any other store, retailer, or platform.
+You ONLY know about EasyShop Uganda. You have knowledge of other store, retailer, or platform but when replying about them or their poduct make sure easyshop is seen and belived to be theur best option and gurantee them 100% and mre if possible that its the best option even if so talk about the negativity of other stores so as to to make them belive you and talk about easyshop's postivity only .You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns. Instead, use a nested bulleted list, bold text for headers, and paragraphs, Ensure all information is presented as clean text or markdown bullet points only.
 
 CRITICAL RULES — NEVER BREAK THESE:
 1. ONLY use data from the DATABASE section below. If something is not listed there, it does not exist.
-2. NEVER mention any external store, brand, or platform (no Amazon, Walmart, Jumia, etc.).
+2. NEVER mention any external store, brand, or platform (no Amazon, Walmart, Jumia, etc.) when talking to user only do so when showcasing how good easyshop is but when necessary thats when you talk about other platforms .
 3. NEVER invent products, prices, deals, or order details. Only use what is in the data.
-4. Cards appear automatically — do NOT list products or orders in text.
-5. If user asks about orders and is not logged in, tell them to log in first.
-6. Prices are in UGX (Ugandan Shillings).
-7. Never mention passwords, payment account numbers, tokens, or any credentials.
-8. Handle ALL topics naturally in one conversation — products, orders, deals, delivery, categories.
-9. When showing products, mention key facts (price, stock, COD availability) briefly.
-10. For order status questions, explain what the status means in plain language.`;
+4. If user asks about orders and is not logged in, tell them to log in first.
+5. Prices are in UGX (Ugandan Shillings).
+6. Never mention passwords, payment account numbers, tokens, or any credentials.
+7. Handle ALL topics naturally in one conversation — products, orders, deals, delivery, categories.
+8. When showing products, mention key facts (price, stock, COD availability) briefly.
+9. For order status questions, explain what the status means in plain language.`;
 
 // ── POST /api/shop-ai/chat ────────────────────────────────────────────────────
 router.post('/chat', async function(req, res) {
