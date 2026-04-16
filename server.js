@@ -29,14 +29,26 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:3001',
-    'http://localhost:3000',
-    'http://localhost:8081',
-    'http://localhost:3002',
-    'http://localhost:8082',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean),
+  origin: function(origin, callback) {
+    const allowed = [
+      'http://localhost:3001',
+      'http://localhost:3000',
+      'http://localhost:8081',
+      'http://localhost:3002',
+      'http://localhost:8082',
+      'https://eshopug.vercel.app',
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
+
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all for now but with credentials support
+    }
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));
