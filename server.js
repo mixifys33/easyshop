@@ -54,6 +54,12 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Allow Google OAuth popup to communicate back
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
 // Routes
 app.use('/api/products/draft', draftRoutes);
 app.use('/api/products', productRoutes);
@@ -98,6 +104,56 @@ app.post('/api/refresh-token', (req, res, next) => {
   req.url = '/refresh-token';
   authRoutes(req, res, next);
 });
+
+// ── Google OAuth login/signup ─────────────────────────────────────────────────
+const fetch = require('node-fetch');
+
+async function handleGoogleAuth(req, res, mode) {
+  try {
+    const { access_token, user_info } = req.body;
+    if (!access_token || !user_info?.email) {
+      return res.status(400).json({ message: 'Missing Google credentials' });
+    }
+
+    // Verify the access token with Google
+    const verifyRes = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    if (!verifyRes.ok) {
+      return res.status(401).json({ message: 'Invalid Google access token' });
+    }
+
+    const email = user_info.email.toLowerCase();
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = new User({
+        name: user_info.name || email.split('@')[0],
+        email,
+        password: `google_${Date.now()}_${Math.random()}`,
+        avatar: user_info.picture || '',
+        googleId: user_info.id,
+        role: 'user',
+      });
+      await user.save();
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({
+      success: true,
+      message: mode === 'login' ? 'Google login successful' : 'Google signup successful',
+      token,
+      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, role: user.role },
+    });
+  } catch (error) {
+    console.error(`Google ${mode} error:`, error.message);
+    res.status(500).json({ message: 'Google authentication failed', error: error.message });
+  }
+}
+
+app.post('/api/google-login',  (req, res) => handleGoogleAuth(req, res, 'login'));
+app.post('/api/google-signup', (req, res) => handleGoogleAuth(req, res, 'signup'));
 
 // ── Follow / Unfollow shop ────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {

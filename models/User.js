@@ -74,6 +74,7 @@ const userSchema = new mongoose.Schema({
   ],
   addresses: [addressSchema],
   followedShops: [{ type: String }],
+  googleId: { type: String, trim: true },
 }, {
   timestamps: true
 });
