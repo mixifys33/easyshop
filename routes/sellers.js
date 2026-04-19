@@ -568,22 +568,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check approval status
-    if (seller.approvalStatus === 'pending_review') {
-      return res.status(403).json({
-        message: 'Application under review',
-        error: 'Your seller application is being reviewed. We will notify you once approved.',
-        approvalStatus: 'pending_review'
-      });
-    }
-    if (seller.approvalStatus === 'rejected') {
-      return res.status(403).json({
-        message: 'Application rejected',
-        error: seller.approvalRejectionReason || 'Your seller application was not approved.',
-        approvalStatus: 'rejected'
-      });
-    }
-    
     // Verify password using the model method
     const isPasswordValid = await seller.comparePassword(password);
     
