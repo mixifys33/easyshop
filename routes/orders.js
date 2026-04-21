@@ -13,6 +13,7 @@ const {
 
 const orderSchema = new mongoose.Schema({
   userId: { type: String },
+  orderRef: { type: String, index: true },
   sellerId: { type: String },
   items: [{
     productId: String,
