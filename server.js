@@ -20,6 +20,8 @@ const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const reviewRoutes = require('./routes/reviews');
 const userAddressRoutes = require('./routes/userAddresses');
+const pushTokenRoutes = require('./routes/pushTokens');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,6 +79,8 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/user/addresses', userAddressRoutes);
+app.use('/api/push-tokens', pushTokenRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);
