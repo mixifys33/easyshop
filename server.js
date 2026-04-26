@@ -20,6 +20,7 @@ const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
 const reviewRoutes = require('./routes/reviews');
 const userAddressRoutes = require('./routes/userAddresses');
+const pushTokenRoutes = require('./routes/pushTokens');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,7 +37,7 @@ app.use(cors({
       'http://localhost:8081',
       'http://localhost:3002',
       'http://localhost:8082',
-      'https://eshopug.vercel.app',
+      'https://global-investments.vercel.app',
       process.env.FRONTEND_URL,
     ].filter(Boolean);
 
@@ -77,6 +78,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/user/addresses', userAddressRoutes);
+app.use('/api/push-tokens', pushTokenRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);

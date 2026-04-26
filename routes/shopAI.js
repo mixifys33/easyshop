@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const fetch = require('node-fetch');
 const router = express.Router();
 const mongoose = require('mongoose');
@@ -10,7 +10,7 @@ const Seller = require('../models/Seller');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// ── Inline CustomerOrder model ────────────────────────────────────────────────
+// â”€â”€ Inline CustomerOrder model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const orderSchema = new mongoose.Schema({
   userId: String, sellerId: String,
   items: [{ productId: String, name: String, price: Number, quantity: Number, image: String }],
@@ -27,7 +27,7 @@ const orderSchema = new mongoose.Schema({
 
 const CustomerOrder = mongoose.models.CustomerOrder || mongoose.model('CustomerOrder', orderSchema);
 
-// ── Model fallback chains ─────────────────────────────────────────────────────
+// â”€â”€ Model fallback chains â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Only models confirmed to support system prompts and free tier
 const MODELS = [
   'openrouter/auto',
@@ -44,7 +44,7 @@ const VISION_MODELS = [
   'openrouter/free',
 ].filter(Boolean);
 
-// Models known NOT to support system role — we merge system into user message for these
+// Models known NOT to support system role â€” we merge system into user message for these
 const NO_SYSTEM_PROMPT_MODELS = [
   'google/gemma-3-12b-it:free',
   'google/gemma-3-4b-it:free',
@@ -61,11 +61,11 @@ function prepareMessages(messages, model) {
   return [{ role: 'user', content: system.content + '\n\n' + rest[0].content }].concat(rest.slice(1));
 }
 
-// ── Safe field selectors — no passwords, tokens, payment credentials ──────────
+// â”€â”€ Safe field selectors â€” no passwords, tokens, payment credentials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PRODUCT_SELECT = 'title regularPrice salePrice category subCategory brand stock description cashOnDelivery images sellerId warranty tags colors sizes customSpecs deliveryFee freeDelivery featured';
 const SELLER_PUBLIC_SELECT = 'shop.shopName shop.shopDescription shop.businessType shop.city shop.isSetup verified metrics delivery.offersDelivery delivery.offersPickup delivery.freeDeliveryThreshold delivery.processingDays delivery.zones delivery.notes';
 
-// ── Call AI with model fallback ───────────────────────────────────────────────
+// â”€â”€ Call AI with model fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(messages, models, maxTokens) {
   maxTokens = maxTokens || 600;
   var lastError = null;
@@ -77,8 +77,8 @@ async function callAI(messages, models, maxTokens) {
         headers: {
           Authorization: 'Bearer ' + OPENROUTER_API_KEY,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://easyshop.com',
-          'X-Title': 'EasyShop AI',
+          'HTTP-Referer': 'https://globalinvestments.com',
+          'X-Title': 'Atlas AI',
         },
         body: JSON.stringify({ model: models[i], messages: prepared, max_tokens: maxTokens, temperature: 0.25 }),
       });
@@ -97,7 +97,7 @@ async function callAI(messages, models, maxTokens) {
   throw new Error('All AI models failed: ' + String(lastError).slice(0, 200));
 }
 
-// ── IMPROVEMENT 1+2: Smarter product search with relevance scoring + price filters ──
+// â”€â”€ IMPROVEMENT 1+2: Smarter product search with relevance scoring + price filters â”€â”€
 function parsePriceFilter(text) {
   // Normalise: remove spaces between digits so "100 000" and "100,000" both parse
   var normalised = text.replace(/(\d)[\s,](\d)/g, '$1$2');
@@ -162,7 +162,7 @@ async function fetchProducts(query, limit, priceFilter) {
   return merged.slice(0, limit);
 }
 
-// ── IMPROVEMENT 5: Order ID lookup ───────────────────────────────────────────
+// â”€â”€ IMPROVEMENT 5: Order ID lookup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function extractOrderId(text) {
   // Match patterns like #ABC123, order ABC123, order id ABC123
   var m = text.match(/(?:#|order\s*(?:id|#|number)?\s*)([a-f0-9]{6,24})/i);
@@ -183,7 +183,7 @@ async function fetchOrderById(orderId, userId) {
       order = await CustomerOrder.findById(orderId).lean();
     }
     if (!order) {
-      // Search by short ID suffix — only return if it belongs to this user
+      // Search by short ID suffix â€” only return if it belongs to this user
       var orders = await CustomerOrder.find({ userId: userId }).sort({ createdAt: -1 }).limit(50).lean();
       order = orders.find(function(o) {
         return o._id.toString().slice(-6).toUpperCase() === orderId.toUpperCase();
@@ -212,29 +212,29 @@ async function fetchDeliveryTerminals() {
     .sort({ region: 1, city: 1 }).lean();
 }
 
-// ── Format helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Format helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getShopName(sellerId) {
-  if (!sellerId) return 'EasyShop';
+  if (!sellerId) return 'Global Investments';
   if (typeof sellerId === 'object') {
-    return (sellerId.shop && sellerId.shop.shopName) || sellerId.shopName || 'EasyShop';
+    return (sellerId.shop && sellerId.shop.shopName) || sellerId.shopName || 'Global Investments';
   }
-  return 'EasyShop';
+  return 'Global Investments';
 }
 
 function formatProductForAI(p) {
   var price = p.salePrice || p.regularPrice || 0;
   var shop = getShopName(p.sellerId);
   var discount = (p.regularPrice && p.salePrice && p.salePrice < p.regularPrice)
-    ? ' [' + Math.round((1 - p.salePrice / p.regularPrice) * 100) + '% OFF from UGX ' + Number(p.regularPrice).toLocaleString() + ']' : '';
+    ? ' [' + Math.round((1 - p.salePrice / p.regularPrice) * 100) + '% OFF from USD ' + Number(p.regularPrice).toLocaleString() + ']' : '';
   var specs = (p.customSpecs || []).map(function(s) { return s.name + ': ' + s.value; }).join(', ');
   return '"' + (p.title || '') + '"'
-    + ' | UGX ' + Number(price).toLocaleString() + discount
+    + ' | USD ' + Number(price).toLocaleString() + discount
     + ' | Stock: ' + (p.stock > 0 ? p.stock + ' units' : 'OUT OF STOCK')
     + ' | Brand: ' + (p.brand || 'N/A')
     + ' | Category: ' + (p.category || '') + (p.subCategory ? ' > ' + p.subCategory : '')
     + ' | Shop: ' + shop
     + (p.cashOnDelivery === 'Yes' ? ' | COD: Yes' : '')
-    + (p.freeDelivery ? ' | Free Delivery' : p.deliveryFee ? ' | Delivery: UGX ' + Number(p.deliveryFee).toLocaleString() : '')
+    + (p.freeDelivery ? ' | Free Delivery' : p.deliveryFee ? ' | Delivery: USD ' + Number(p.deliveryFee).toLocaleString() : '')
     + (p.warranty ? ' | Warranty: ' + p.warranty : '')
     + (specs ? ' | Specs: ' + specs : '')
     + (p.colors && p.colors.length ? ' | Colors: ' + p.colors.join(', ') : '')
@@ -249,7 +249,7 @@ function formatProductCard(p) {
     name: p.title || '',
     price: price,
     originalPrice: (p.regularPrice && p.salePrice && p.salePrice < p.regularPrice) ? p.regularPrice : null,
-    priceFormatted: 'UGX ' + Number(price).toLocaleString(),
+    priceFormatted: 'USD ' + Number(price).toLocaleString(),
     category: p.category || '',
     subCategory: p.subCategory || '',
     brand: p.brand || '',
@@ -270,9 +270,9 @@ function formatProductCard(p) {
 
 function formatOrderForAI(o) {
   var items = (o.items || []).map(function(i) {
-    return i.name + ' x' + i.quantity + ' @ UGX ' + Number(i.price || 0).toLocaleString();
+    return i.name + ' x' + i.quantity + ' @ USD ' + Number(i.price || 0).toLocaleString();
   }).join(', ');
-  var total = o.subtotal ? 'UGX ' + Number(o.subtotal).toLocaleString() : 'N/A';
+  var total = o.subtotal ? 'USD ' + Number(o.subtotal).toLocaleString() : 'N/A';
   var date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
   var delivery = o.delivery && o.delivery.name
     ? o.delivery.name + (o.delivery.estimatedDays ? ' (' + o.delivery.estimatedDays + ' days)' : '')
@@ -281,7 +281,7 @@ function formatOrderForAI(o) {
     + ' | Status: ' + (o.status || 'pending').toUpperCase()
     + ' | Payment: ' + (o.paymentStatus || 'pending') + ' via ' + (o.paymentMethod || 'N/A')
     + ' | Items: ' + (items || 'N/A')
-    + ' | Total: ' + total + (o.deliveryFee ? ' + UGX ' + Number(o.deliveryFee).toLocaleString() + ' delivery' : '')
+    + ' | Total: ' + total + (o.deliveryFee ? ' + USD ' + Number(o.deliveryFee).toLocaleString() + ' delivery' : '')
     + ' | Delivery: ' + delivery
     + ' | Date: ' + date;
 }
@@ -302,11 +302,11 @@ function formatOrderCard(o) {
   };
 }
 
-// ── IMPROVEMENT 4: Campaign-to-product linking ────────────────────────────────
+// â”€â”€ IMPROVEMENT 4: Campaign-to-product linking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function formatCampaignForAI(c) {
   var discount = c.discountType === 'percentage'
     ? c.discountValue + '% off'
-    : 'UGX ' + Number(c.discountValue).toLocaleString() + ' off';
+    : 'USD ' + Number(c.discountValue).toLocaleString() + ' off';
   var end = c.endDate ? new Date(c.endDate).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '?';
 
   var appliesInfo = '';
@@ -324,7 +324,7 @@ async function formatCampaignForAI(c) {
     + ' | Type: ' + c.type.replace(/_/g, ' ')
     + ' | Discount: ' + discount
     + (c.couponCode ? ' | Coupon code: ' + c.couponCode : '')
-    + (c.minOrderAmount ? ' | Min order: UGX ' + Number(c.minOrderAmount).toLocaleString() : '')
+    + (c.minOrderAmount ? ' | Min order: USD ' + Number(c.minOrderAmount).toLocaleString() : '')
     + ' | Ends: ' + end
     + appliesInfo;
 }
@@ -334,7 +334,7 @@ function formatSellerForAI(s) {
   var shop = s.shop || {};
   var delivery = s.delivery || {};
   var zones = (delivery.zones || []).filter(function(z) { return z.active; })
-    .map(function(z) { return z.name + ' (UGX ' + Number(z.fee || 0).toLocaleString() + ', ' + (z.estimatedDays || '?') + ' days)'; }).join(', ');
+    .map(function(z) { return z.name + ' (USD ' + Number(z.fee || 0).toLocaleString() + ', ' + (z.estimatedDays || '?') + ' days)'; }).join(', ');
   return 'Shop: ' + (shop.shopName || 'N/A')
     + ' | Type: ' + (shop.businessType || 'N/A')
     + ' | City: ' + (shop.city || 'N/A')
@@ -342,12 +342,12 @@ function formatSellerForAI(s) {
     + ' | Rating: ' + (s.metrics && s.metrics.rating ? s.metrics.rating + '/5 (' + s.metrics.reviewCount + ' reviews)' : 'N/A')
     + ' | Home delivery: ' + (delivery.offersDelivery ? 'Yes' : 'No')
     + ' | Pickup: ' + (delivery.offersPickup ? 'Yes' : 'No')
-    + (delivery.freeDeliveryThreshold ? ' | Free delivery from: UGX ' + Number(delivery.freeDeliveryThreshold).toLocaleString() : '')
+    + (delivery.freeDeliveryThreshold ? ' | Free delivery from: USD ' + Number(delivery.freeDeliveryThreshold).toLocaleString() : '')
     + (zones ? ' | Delivery zones: ' + zones : '')
     + (delivery.notes ? ' | Notes: ' + delivery.notes : '');
 }
 
-// ── Topic detection — scans full conversation, never loses context ─────────────
+// â”€â”€ Topic detection â€” scans full conversation, never loses context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function detectTopics(messages) {
   var allText = messages.map(function(m) { return (m.content || '').toLowerCase(); }).join(' ');
   var lastUser = '';
@@ -378,7 +378,7 @@ function extractSearchQuery(lastUserText) {
     .slice(0, 100);
 }
 
-// ── IMPROVEMENT 6: Suggested follow-up chips based on context ─────────────────
+// â”€â”€ IMPROVEMENT 6: Suggested follow-up chips based on context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildSuggestions(topics, hasProducts, hasOrders) {
   var chips = [];
   if (hasProducts) {
@@ -401,7 +401,7 @@ function buildSuggestions(topics, hasProducts, hasOrders) {
   return chips.slice(0, 4);
 }
 
-// ── Build full DB context ─────────────────────────────────────────────────────
+// â”€â”€ Build full DB context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function buildSystemContext(messages, userId) {
   var topics = detectTopics(messages);
   var contextParts = [];
@@ -421,9 +421,9 @@ async function buildSystemContext(messages, userId) {
   // IMPROVEMENT 4: campaigns with linked products
   if (campaigns.length) {
     var campaignLines = await Promise.all(campaigns.map(formatCampaignForAI));
-    contextParts.push('\nACTIVE DEALS & CAMPAIGNS ON EASYSHOP UGANDA RIGHT NOW:\n' + campaignLines.join('\n'));
+    contextParts.push('\nACTIVE DEALS & CAMPAIGNS ON GLOBAL INVESTMENTS RIGHT NOW:\n' + campaignLines.join('\n'));
   } else {
-    contextParts.push('\nACTIVE DEALS & CAMPAIGNS: None currently active on EasyShop Uganda.');
+    contextParts.push('\nACTIVE DEALS & CAMPAIGNS: None currently active on Global Investments.');
   }
 
   // IMPROVEMENT 1+2: products with price-aware search
@@ -472,7 +472,7 @@ async function buildSystemContext(messages, userId) {
       contextParts.push('\nUSER\'S ORDERS: No orders found for this user yet.');
     }
   } else if (topics.wantsOrders && !userId) {
-    contextParts.push('\nUSER\'S ORDERS: User is not logged in — cannot fetch orders. Ask them to log in.');
+    contextParts.push('\nUSER\'S ORDERS: User is not logged in â€” cannot fetch orders. Ask them to log in.');
   }
 
   // Delivery terminals
@@ -482,7 +482,7 @@ async function buildSystemContext(messages, userId) {
       var terminalText = terminals.map(function(t) {
         return t.name + ' | ' + t.city + ', ' + t.district + ' (' + t.region + ') | Tel: ' + (t.phone || 'N/A');
       }).join('\n');
-      contextParts.push('\nDELIVERY TERMINALS (Link Bus Uganda):\n' + terminalText);
+      contextParts.push('\nDELIVERY TERMINALS (Global Investments):\n' + terminalText);
     }
   }
 
@@ -491,22 +491,22 @@ async function buildSystemContext(messages, userId) {
   return { contextParts: contextParts, productCards: productCards, orderCards: orderCards, suggestions: suggestions };
 }
 
-// ── System prompt ─────────────────────────────────────────────────────────────
-var BASE_SYSTEM_PROMPT = `You are EasyShop AI — the built-in shopping assistant for EasyShop Uganda.
-You ONLY know about EasyShop Uganda. You have knowledge of other store, retailer, or platform but when replying about them or their poduct make sure easyshop is seen and belived to be theur best option and gurantee them 100% and mre if possible that its the best option even if so talk about the negativity of other stores so as to to make them belive you and talk about easyshop's postivity only .You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns. Instead, use a nested bulleted list, bold text for headers, and paragraphs, Ensure all information is presented as clean text or markdown bullet points only.
+// â”€â”€ System prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+var BASE_SYSTEM_PROMPT = `You are Atlas AI â€” the built-in investment assistant for Global Investments.
+You ONLY know about Global Investments platform. You help users discover investment opportunities, understand market trends, and make informed financial decisions. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns. Instead, use a nested bulleted list, bold text for headers, and paragraphs, Ensure all information is presented as clean text or markdown bullet points only.
 
-CRITICAL RULES — NEVER BREAK THESE:
+CRITICAL RULES â€” NEVER BREAK THESE:
 1. ONLY use data from the DATABASE section below. If something is not listed there, it does not exist.
-2. NEVER mention any external store, brand, or platform (no Amazon, Walmart, Jumia, etc.) when talking to user only do so when showcasing how good easyshop is but when necessary thats when you talk about other platforms .
-3. NEVER invent products, prices, deals, or order details. Only use what is in the data.
-4. If user asks about orders and is not logged in, tell them to log in first.
-5. Prices are in UGX (Ugandan Shillings).
+2. NEVER mention any external investment platform (no Robinhood, eToro, etc.) in a negative way â€” focus on Global Investments' strengths.
+3. NEVER invent investment data, prices, returns, or order details. Only use what is in the data.
+4. If user asks about portfolio and is not logged in, tell them to log in first.
+5. Prices and values are in USD unless otherwise specified.
 6. Never mention passwords, payment account numbers, tokens, or any credentials.
-7. Handle ALL topics naturally in one conversation — products, orders, deals, delivery, categories.
-8. When showing products, mention key facts (price, stock, COD availability) briefly.
-9. For order status questions, explain what the status means in plain language.`;
+7. Handle ALL topics naturally in one conversation â€” investments, portfolios, market data, returns, categories.
+8. When showing investments, mention key facts (price, returns, risk level) briefly.
+9. For order/transaction status questions, explain what the status means in plain language.`;
 
-// ── POST /api/shop-ai/chat ────────────────────────────────────────────────────
+// â”€â”€ POST /api/shop-ai/chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/chat', async function(req, res) {
   try {
     var messages = req.body.messages || [];
@@ -520,9 +520,9 @@ router.post('/chat', async function(req, res) {
     var dbContext = await buildSystemContext(messages, userId);
 
     var systemPrompt = BASE_SYSTEM_PROMPT
-      + '\n\n=== LIVE DATA FROM EASYSHOP UGANDA DATABASE (USE ONLY THIS) ===\n'
+      + '\n\n=== LIVE DATA FROM GLOBAL INVESTMENTS DATABASE (USE ONLY THIS) ===\n'
       + dbContext.contextParts.join('\n')
-      + '\n=== END OF DATABASE DATA — DO NOT USE ANY OTHER SOURCE ===';
+      + '\n=== END OF DATABASE DATA â€” DO NOT USE ANY OTHER SOURCE ===';
 
     var cleanHistory = messages.filter(function(m) {
       return m.role && m.content && !m.loading;
@@ -548,7 +548,7 @@ router.post('/chat', async function(req, res) {
   }
 });
 
-// ── POST /api/shop-ai/image-search ───────────────────────────────────────────
+// â”€â”€ POST /api/shop-ai/image-search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/image-search', async function(req, res) {
   try {
     var imageUrl = req.body.imageUrl;
@@ -583,11 +583,11 @@ router.post('/image-search', async function(req, res) {
 
     var productContext = rawProducts.length
       ? rawProducts.map(formatProductForAI).join('\n')
-      : '(no matching products found in EasyShop Uganda database)';
+      : '(no matching investments found in Global Investments database)';
 
-    var systemPrompt = 'You are EasyShop AI. The user uploaded an image.\n'
+    var systemPrompt = 'You are Atlas AI. The user uploaded an image.\n'
       + 'Identified: ' + (identified.productName || 'unknown') + ' | Brand: ' + (identified.brand || 'unknown') + '\n\n'
-      + 'MATCHING PRODUCTS IN EASYSHOP UGANDA:\n' + productContext + '\n\n'
+      + 'MATCHING INVESTMENTS IN GLOBAL INVESTMENTS:\n' + productContext + '\n\n'
       + 'ONLY reference products listed above. Never mention other stores.';
 
     var reply = await callAI([
@@ -609,7 +609,7 @@ router.post('/image-search', async function(req, res) {
   }
 });
 
-// ── GET /api/shop-ai/recommendations ─────────────────────────────────────────
+// â”€â”€ GET /api/shop-ai/recommendations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/recommendations', async function(req, res) {
   try {
     var category = req.query.category || '';
@@ -622,3 +622,4 @@ router.get('/recommendations', async function(req, res) {
 });
 
 module.exports = router;
+

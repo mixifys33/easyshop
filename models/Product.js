@@ -56,7 +56,7 @@ const productSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'UGX'
+    default: 'USD'
   },
 
   // Inventory

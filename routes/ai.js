@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const fetch = require('node-fetch');
 const router = express.Router();
 const Product = require('../models/Product');
@@ -6,7 +6,7 @@ const Product = require('../models/Product');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Free models in priority order — only ones confirmed to support system prompts
+// Free models in priority order â€” only ones confirmed to support system prompts
 const FREE_MODELS = [
   process.env.OPENROUTER_MODEL,
   'openrouter/auto',
@@ -76,31 +76,31 @@ const formatRelatedProducts = (products) => {
   if (!products.length) return '';
   return products.map((p, i) => {
     const price = p.salePrice
-      ? `UGX ${Number(p.salePrice).toLocaleString()}`
-      : `UGX ${Number(p.regularPrice).toLocaleString()}`;
-    const shop = p.sellerId?.shopName || 'EasyShop';
+      ? `USD ${Number(p.salePrice).toLocaleString()}`
+      : `USD ${Number(p.regularPrice).toLocaleString()}`;
+    const shop = p.sellerId?.shopName || 'Global Investments';
     const verified = p.sellerId?.verified ? ' (Verified)' : '';
     const desc = p.description ? p.description.slice(0, 100) : '';
-    return `${i + 1}. ${p.title} — ${price} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock > 0 ? p.stock + ' units' : 'Out of stock'} | Shop: ${shop}${verified}\n   ${desc}`;
+    return `${i + 1}. ${p.title} â€” ${price} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock > 0 ? p.stock + ' units' : 'Out of stock'} | Shop: ${shop}${verified}\n   ${desc}`;
   }).join('\n\n');
 };
 
 // Build the system prompt with full product context
 const buildSystemPrompt = (product, relatedProducts = []) => {
-  const price = product.price ? `UGX ${Number(product.price).toLocaleString()}` : 'N/A';
-  const originalPrice = product.originalPrice ? `UGX ${Number(product.originalPrice).toLocaleString()}` : null;
+  const price = product.price ? `USD ${Number(product.price).toLocaleString()}` : 'N/A';
+  const originalPrice = product.originalPrice ? `USD ${Number(product.originalPrice).toLocaleString()}` : null;
   const discount = originalPrice
     ? `${Math.round((1 - product.price / product.originalPrice) * 100)}% off from ${originalPrice}`
     : null;
 
   const relatedSection = relatedProducts.length > 0
-    ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options — use ONLY the products listed above. Never invent or mention products not listed here.\n`
+    ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options â€” use ONLY the products listed above. Never invent or mention products not listed here.\n`
     : '';
 
-  return `You are a helpful AI shopping assistant for EasyShop called ADO-( Advanced Developtilasied Optimatic AI after your creator Masereka Adorable Kimulya), an e-commerce store in Uganda. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
-Do not recommend other stores or platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
+  return `You are Atlas AI â€” a helpful investment assistant for Global Investments. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
+Do not recommend other platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
 
-CURRENT PRODUCT:
+CURRENT INVESTMENT:
 - Name: ${product.name || product.title || 'Unknown'}
 - Price: ${price}${discount ? ` (${discount})` : ''}
 - Category: ${product.category || 'N/A'}
@@ -108,17 +108,16 @@ CURRENT PRODUCT:
 - Brand: ${product.brand || 'N/A'}
 - Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Out of stock'}
 - Description: ${product.description || 'No description available'}
-- Seller/Shop: ${product.seller?.name || 'EasyShop Store'}
-- Seller Verified: ${product.seller?.verified ? 'Yes' : 'No'}
-- Cash on Delivery: ${product.cashOnDelivery || 'Available'}
-- Currency: UGX (Ugandan Shillings)
+- Advisor/Firm: ${product.seller?.name || 'Global Investments'}
+- Advisor Verified: ${product.seller?.verified ? 'Yes' : 'No'}
+- Currency: USD
 ${relatedSection}
 YOUR ROLE:
-- Answer questions about this product honestly and helpfully
-- Help the customer decide if this product suits their needs
-- Explain technical specs in simple, clear language
-- Compare with real alternatives from the store when asked
-- Be concise — short and direct unless detail is needed
+- Answer questions about this investment honestly and helpfully
+- Help the client decide if this investment suits their financial goals
+- Explain financial details in simple, clear language
+- Compare with real alternatives from the platform when asked
+- Be concise â€” short and direct unless detail is needed
 - Never make up specs, prices, or products not listed above
 - Always be friendly and supportive
 
@@ -145,9 +144,9 @@ router.post('/chat', async (req, res) => {
     // Fetch related products if the user is asking for comparisons/alternatives
     let relatedProducts = [];
     if (needsComparison(messages)) {
-      console.log('🔍 Comparison query detected — fetching related products from DB...');
+      console.log('ðŸ” Comparison query detected â€” fetching related products from DB...');
       relatedProducts = await getRelatedProducts(product);
-      console.log(`� Found ${relatedProducts.length} related products`);
+      console.log(`ï¿½ Found ${relatedProducts.length} related products`);
     }
 
     const systemPrompt = buildSystemPrompt(product, relatedProducts);
@@ -160,13 +159,13 @@ router.post('/chat', async (req, res) => {
       })),
     ];
 
-    console.log(`🤖 AI Chat — product: ${product.name || product.title} | messages: ${messages.length}`);
+    console.log(`ðŸ¤– AI Chat â€” product: ${product.name || product.title} | messages: ${messages.length}`);
 
     let data = null;
     let lastError = null;
 
     for (const model of FREE_MODELS) {
-      console.log(`🔑 Trying model: ${model}`);
+      console.log(`ðŸ”‘ Trying model: ${model}`);
       let response;
       try {
         response = await fetch(OPENROUTER_URL, {
@@ -174,8 +173,8 @@ router.post('/chat', async (req, res) => {
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://easyshop.com',
-            'X-Title': 'EasyShop AI Assistant',
+            'HTTP-Referer': 'https://globalinvestments.com',
+            'X-Title': 'Atlas AI Assistant',
           },
           body: JSON.stringify({
             model,
@@ -190,7 +189,7 @@ router.post('/chat', async (req, res) => {
         continue;
       }
 
-      console.log(`📡 Response status for ${model}: ${response.status}`);
+      console.log(`ðŸ“¡ Response status for ${model}: ${response.status}`);
       const rawText = await response.text();
 
       if (response.status === 429 || response.status === 503 || response.status === 400 || response.status === 402 || response.status === 404) {
@@ -207,7 +206,7 @@ router.post('/chat', async (req, res) => {
 
       try {
         data = JSON.parse(rawText);
-        console.log(`✅ Got response from model: ${model}`);
+        console.log(`âœ… Got response from model: ${model}`);
         break;
       } catch (parseErr) {
         console.error(`Failed to parse response from ${model}:`, parseErr.message);
@@ -235,7 +234,7 @@ router.post('/chat', async (req, res) => {
       return res.status(502).json({ success: false, message: 'No response from AI', raw: data });
     }
 
-    console.log(`✅ AI replied (${aiReply.length} chars)`);
+    console.log(`âœ… AI replied (${aiReply.length} chars)`);
 
     // Include related products in response so frontend can render comparison cards
     const responsePayload = { success: true, reply: aiReply.trim() };
@@ -262,3 +261,4 @@ router.post('/chat', async (req, res) => {
 });
 
 module.exports = router;
+

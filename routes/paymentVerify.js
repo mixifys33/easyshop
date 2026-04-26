@@ -1,11 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const fetch = require('node-fetch');
 const router = express.Router();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Vision-capable free models in priority order — updated April 2026
+// Vision-capable free models in priority order â€” updated April 2026
 const VISION_MODELS = [
   'qwen/qwen2.5-vl-72b-instruct:free',
   'meta-llama/llama-4-scout:free',
@@ -17,19 +17,19 @@ const VISION_MODELS = [
   'meta-llama/llama-4-maverick:free',
 ];
 
-// Call AI with model fallback — returns parsed result or null
+// Call AI with model fallback â€” returns parsed result or null
 async function callAI(messages) {
   let lastError = null;
   for (const model of VISION_MODELS) {
-    console.log(`🔍 Payment verify — trying: ${model}`);
+    console.log(`ðŸ” Payment verify â€” trying: ${model}`);
     try {
       const response = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://easyshop.com',
-          'X-Title': 'EasyShop Payment Verification',
+          'HTTP-Referer': 'https://globalinvestments.com',
+          'X-Title': 'Global Investments Payment Verification',
         },
         body: JSON.stringify({ model, messages, max_tokens: 800, temperature: 0.1 }),
       });
@@ -55,7 +55,7 @@ async function callAI(messages) {
       }
 
       const result = JSON.parse(jsonMatch[0]);
-      console.log(`✅ Payment verify response from: ${model} — verified=${result.verified}`);
+      console.log(`âœ… Payment verify response from: ${model} â€” verified=${result.verified}`);
       return result;
     } catch (e) {
       lastError = e.message;
@@ -75,20 +75,20 @@ IMPORTANT: This is a financial transaction. Be strict. Do NOT pass if you are un
 
 Check this single image for ALL of the following:
 
-1. RECIPIENT NAME — Must match or closely resemble: "${expectedRecipientName || 'N/A'}". Partial name match is OK but must be recognisable.
-2. PHONE NUMBER — Must match: "${expectedPhone || 'N/A'}". Digits must match exactly.
-3. AMOUNT — Must match: ${amountFormatted}. Allow ±5% tolerance only.
-4. REASON/REFERENCE — Should relate to: "${productNames || 'product payment'}". Any word overlap is fine.
-5. MESSAGE FORMAT — Must look like a genuine ${methodLabel} send-money confirmation SMS or app screenshot. NOT a chat message, NOT a received-money notification, NOT a balance check.
-6. NOT FAKE — Must appear genuine. Reject if: text looks copy-pasted, fonts are inconsistent, background is plain white with no UI chrome, amounts or names look edited, or the image is AI-generated.
-7. DUPLICATE CHECK — This is image ${imageIndex}. If this image looks identical or nearly identical to what you would expect the other screenshot to be (same transaction, same timestamp, same amount), note it.
+1. RECIPIENT NAME â€” Must match or closely resemble: "${expectedRecipientName || 'N/A'}". Partial name match is OK but must be recognisable.
+2. PHONE NUMBER â€” Must match: "${expectedPhone || 'N/A'}". Digits must match exactly.
+3. AMOUNT â€” Must match: ${amountFormatted}. Allow Â±5% tolerance only.
+4. REASON/REFERENCE â€” Should relate to: "${productNames || 'product payment'}". Any word overlap is fine.
+5. MESSAGE FORMAT â€” Must look like a genuine ${methodLabel} send-money confirmation SMS or app screenshot. NOT a chat message, NOT a received-money notification, NOT a balance check.
+6. NOT FAKE â€” Must appear genuine. Reject if: text looks copy-pasted, fonts are inconsistent, background is plain white with no UI chrome, amounts or names look edited, or the image is AI-generated.
+7. DUPLICATE CHECK â€” This is image ${imageIndex}. If this image looks identical or nearly identical to what you would expect the other screenshot to be (same transaction, same timestamp, same amount), note it.
 
 STRICT RULES:
-- If notFake fails → verified MUST be false, no exceptions.
-- If messageFormat fails → verified MUST be false.
-- If both recipientName AND phoneNumber fail → verified MUST be false.
-- If amount is wrong by more than 5% → verified MUST be false.
-- When in doubt → set verified to false. This is a money transaction.
+- If notFake fails â†’ verified MUST be false, no exceptions.
+- If messageFormat fails â†’ verified MUST be false.
+- If both recipientName AND phoneNumber fail â†’ verified MUST be false.
+- If amount is wrong by more than 5% â†’ verified MUST be false.
+- When in doubt â†’ set verified to false. This is a money transaction.
 
 Respond ONLY with valid JSON, no markdown, no text outside the JSON:
 {
@@ -137,8 +137,8 @@ router.post('/', async (req, res) => {
 
     const amountFormatted = expectedAmount ? `UGX ${Number(expectedAmount).toLocaleString()}` : 'N/A';
 
-    // ── Verify each image INDEPENDENTLY ──────────────────────────────────────
-    console.log(`🔍 Verifying ${imageUrls.length} images independently...`);
+    // â”€â”€ Verify each image INDEPENDENTLY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    console.log(`ðŸ” Verifying ${imageUrls.length} images independently...`);
 
     const perImageResults = await Promise.all(imageUrls.map(async (url, idx) => {
       const systemPrompt = buildPrompt(
@@ -172,7 +172,7 @@ router.post('/', async (req, res) => {
       return { ...result, imageIndex: idx + 1 };
     }));
 
-    // ── Cross-check: detect duplicate images ──────────────────────────────────
+    // â”€â”€ Cross-check: detect duplicate images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let duplicateWarning = null;
     if (perImageResults.length === 2) {
       const r1 = perImageResults[0];
@@ -189,7 +189,7 @@ router.post('/', async (req, res) => {
     const allVerified = perImageResults.every(r => r.verified === true);
     const anyFailed   = perImageResults.some(r => r.verified === false);
 
-    // ── Final verdict: BOTH must pass independently ───────────────────────────
+    // â”€â”€ Final verdict: BOTH must pass independently â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let finalVerified, finalSummary, finalRejectionReason = null;
 
     if (duplicateWarning) {
@@ -221,7 +221,7 @@ router.post('/', async (req, res) => {
     });
 
     const overallConfidence = allVerified ? 'high' : anyFailed ? 'low' : 'medium';
-    console.log(`✅ Final verdict: verified=${finalVerified}, confidence=${overallConfidence}`);
+    console.log(`âœ… Final verdict: verified=${finalVerified}, confidence=${overallConfidence}`);
 
     res.json({
       success: true,
@@ -243,3 +243,4 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+

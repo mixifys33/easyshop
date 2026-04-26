@@ -10,7 +10,7 @@ const addressSchema = new mongoose.Schema({
   apartment: { type: String, trim: true },
   city: { type: String, required: true, trim: true },
   region: { type: String, trim: true },
-  country: { type: String, default: 'Uganda', trim: true },
+  country: { type: String, default: '', trim: true },
   postalCode: { type: String, trim: true },
   isDefault: { type: Boolean, default: false },
 }, { _id: true, timestamps: true });
