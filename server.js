@@ -1,7 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
+const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database');
 require('dotenv').config();
+
+// Import models for socket authentication
+const User = require('./models/User');
+const Seller = require('./models/Seller');
 
 // Import routes
 const productRoutes = require('./routes/products');
@@ -22,8 +29,36 @@ const reviewRoutes = require('./routes/reviews');
 const userAddressRoutes = require('./routes/userAddresses');
 const pushTokenRoutes = require('./routes/pushTokens');
 const adminRoutes = require('./routes/admin');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: function(origin, callback) {
+      const allowed = [
+        'http://localhost:3001',
+        'http://localhost:3000',
+        'http://localhost:8081',
+        'http://localhost:3002',
+        'http://localhost:8082',
+        'https://global-investments.vercel.app',
+        process.env.FRONTEND_URL,
+      ].filter(Boolean);
+
+      // Allow requests with no origin (mobile apps)
+      if (!origin) return callback(null, true);
+
+      if (allowed.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all for now
+      }
+    },
+    credentials: true,
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Connect to database
@@ -62,6 +97,139 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Socket.IO Setup ──────────────────────────────────────────────────────
+// Store connected users
+const connectedUsers = new Map();
+
+// Socket.IO authentication middleware
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication error: No token provided'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Try to find user first
+    let user = await User.findById(decoded.userId).select('-password');
+    let userType = 'User';
+    
+    // If not found as user, try as seller
+    if (!user) {
+      user = await Seller.findById(decoded.userId).select('-password');
+      userType = 'Seller';
+    }
+
+    if (!user) {
+      return next(new Error('Authentication error: User not found'));
+    }
+
+    // Add user info to socket
+    socket.userId = user._id.toString();
+    socket.userType = userType;
+    socket.userData = {
+      id: user._id,
+      name: user.name || user.shopName,
+      email: user.email,
+      avatar: user.profileImage,
+      userType: userType
+    };
+
+    next();
+  } catch (error) {
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 User connected: ${socket.userData.name} (${socket.userData.userType})`);
+  
+  // Store connected user
+  connectedUsers.set(socket.userId, {
+    socketId: socket.id,
+    userData: socket.userData,
+    lastSeen: new Date()
+  });
+
+  // Join user to their personal room for private messages
+  socket.join(`user_${socket.userId}`);
+  
+  // Join public chat room
+  socket.join('public_chat');
+
+  // Handle joining conversation rooms
+  socket.on('join_conversation', (conversationId) => {
+    socket.join(`conversation_${conversationId}`);
+    console.log(`👥 ${socket.userData.name} joined conversation: ${conversationId}`);
+  });
+
+  // Handle leaving conversation rooms
+  socket.on('leave_conversation', (conversationId) => {
+    socket.leave(`conversation_${conversationId}`);
+    console.log(`👋 ${socket.userData.name} left conversation: ${conversationId}`);
+  });
+
+  // Handle new message events
+  socket.on('new_message', (data) => {
+    // Emit to conversation room
+    if (data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('message_received', data);
+    }
+  });
+
+  // Handle new public message events
+  socket.on('new_public_message', (data) => {
+    // Emit to public chat room
+    socket.to('public_chat').emit('public_message_received', data);
+  });
+
+  // Handle typing indicators
+  socket.on('typing_start', (data) => {
+    if (data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('user_typing', {
+        userId: socket.userId,
+        userName: socket.userData.name,
+        conversationId: data.conversationId
+      });
+    }
+  });
+
+  socket.on('typing_stop', (data) => {
+    if (data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('user_stopped_typing', {
+        userId: socket.userId,
+        conversationId: data.conversationId
+      });
+    }
+  });
+
+  // Handle message read events
+  socket.on('message_read', (data) => {
+    if (data.conversationId) {
+      socket.to(`conversation_${data.conversationId}`).emit('message_marked_read', {
+        messageId: data.messageId,
+        userId: socket.userId,
+        conversationId: data.conversationId
+      });
+    }
+  });
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    console.log(`🔌 User disconnected: ${socket.userData.name}`);
+    connectedUsers.delete(socket.userId);
+  });
+
+  // Send online users count to public chat
+  socket.emit('online_users_count', connectedUsers.size);
+  socket.to('public_chat').emit('online_users_count', connectedUsers.size);
+});
+
+// Make io available to routes
+app.set('io', io);
+
 // Routes
 app.use('/api/products/draft', draftRoutes);
 app.use('/api/products', productRoutes);
@@ -81,6 +249,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/user/addresses', userAddressRoutes);
 app.use('/api/push-tokens', pushTokenRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);
@@ -256,6 +425,7 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔌 Socket.IO enabled for real-time chat`);
 });

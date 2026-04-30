@@ -292,19 +292,110 @@ router.patch('/sellers/:id/unsuspend', adminAuth, async (req, res) => {
 // ── GET /api/admin/users ─────────────────────────────────────────────────────
 router.get('/users', adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
-    const users = await User.find({})
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
-      .lean();
+    const { page = 1, limit = 20, search = '', sort = 'newest', role } = req.query;
 
-    const total = await User.countDocuments({});
-    res.json({ success: true, users, total });
+    // Build query
+    const query = {};
+    if (role) query.role = role;
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Sort options
+    const sortMap = {
+      newest:   { createdAt: -1 },
+      oldest:   { createdAt: 1 },
+      name_asc: { name: 1 },
+      name_desc:{ name: -1 },
+    };
+    const sortObj = sortMap[sort] || { createdAt: -1 };
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort(sortObj)
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit))
+        .lean(),
+      User.countDocuments(query),
+    ]);
+
+    res.json({ success: true, users, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
     console.error('[Admin] Get users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// ── GET /api/admin/users/:id — full user detail with orders ──────────────────
+router.get('/users/:id', adminAuth, async (req, res) => {
+  try {
+    const Order = require('../models/Order');
+
+    const [user, orders] = await Promise.all([
+      User.findById(req.params.id).select('-password').lean(),
+      Order.find({ 'buyerInfo.userId': req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+    ]);
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Order stats
+    const totalSpent = orders
+      .filter(o => !['cancelled'].includes(o.status?.toLowerCase()))
+      .reduce((sum, o) => sum + (o.subtotal || 0) + (o.deliveryFee || 0), 0);
+
+    res.json({
+      success: true,
+      user,
+      orders,
+      stats: {
+        totalOrders: orders.length,
+        totalSpent,
+        completedOrders: orders.filter(o => o.status?.toLowerCase() === 'delivered').length,
+        pendingOrders: orders.filter(o => o.status?.toLowerCase() === 'pending').length,
+        cancelledOrders: orders.filter(o => o.status?.toLowerCase() === 'cancelled').length,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin] Get user detail error:', err);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+// ── PATCH /api/admin/users/:id/ban ───────────────────────────────────────────
+router.patch('/users/:id/ban', adminAuth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isBanned: true, bannedAt: new Date() },
+      { new: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, message: 'User banned', user });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to ban user' });
+  }
+});
+
+// ── PATCH /api/admin/users/:id/unban ─────────────────────────────────────────
+router.patch('/users/:id/unban', adminAuth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isBanned: false, $unset: { bannedAt: '' } },
+      { new: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, message: 'User unbanned', user });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to unban user' });
   }
 });
 
