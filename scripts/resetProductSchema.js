@@ -1,13 +1,13 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 require('dotenv').config();
 
 // Connect to database
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/easyshop');
-    console.log('✅ Connected to MongoDB');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/global-investments');
+    console.log('âœ… Connected to MongoDB');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('âŒ MongoDB connection error:', error);
     process.exit(1);
   }
 };
@@ -15,7 +15,7 @@ const connectDB = async () => {
 // Reset Product schema
 const resetProductSchema = async () => {
   try {
-    console.log('\n🔄 RESETTING PRODUCT SCHEMA\n');
+    console.log('\nðŸ”„ RESETTING PRODUCT SCHEMA\n');
     console.log('='.repeat(50));
 
     // Check if products collection exists
@@ -23,26 +23,26 @@ const resetProductSchema = async () => {
     const productCollection = collections.find(col => col.name === 'products');
     
     if (productCollection) {
-      console.log('📦 Found existing products collection');
+      console.log('ðŸ“¦ Found existing products collection');
       
       // Get count of existing products
       const existingCount = await mongoose.connection.db.collection('products').countDocuments();
-      console.log(`📊 Existing products: ${existingCount}`);
+      console.log(`ðŸ“Š Existing products: ${existingCount}`);
       
       if (existingCount > 0) {
-        console.log('⚠️  WARNING: This will delete all existing products!');
-        console.log('💾 Consider backing up your data first');
+        console.log('âš ï¸  WARNING: This will delete all existing products!');
+        console.log('ðŸ’¾ Consider backing up your data first');
         
         // In a real scenario, you might want to migrate data instead of dropping
         // For now, we'll drop the collection to reset the schema
         await mongoose.connection.db.collection('products').drop();
-        console.log('🗑️  Dropped existing products collection');
+        console.log('ðŸ—‘ï¸  Dropped existing products collection');
       } else {
         await mongoose.connection.db.collection('products').drop();
-        console.log('🗑️  Dropped empty products collection');
+        console.log('ðŸ—‘ï¸  Dropped empty products collection');
       }
     } else {
-      console.log('📦 No existing products collection found');
+      console.log('ðŸ“¦ No existing products collection found');
     }
 
     // Import the new Product model to create the collection with new schema
@@ -68,13 +68,13 @@ const resetProductSchema = async () => {
     });
 
     await testProduct.save();
-    console.log('✅ Created test product with new schema');
+    console.log('âœ… Created test product with new schema');
     
     // Remove the test product
     await Product.findByIdAndDelete(testProduct._id);
-    console.log('🗑️  Removed test product');
+    console.log('ðŸ—‘ï¸  Removed test product');
 
-    console.log('\n📋 New Product Schema Fields:');
+    console.log('\nðŸ“‹ New Product Schema Fields:');
     console.log('- title (required)');
     console.log('- description (required)');
     console.log('- category (required)');
@@ -88,11 +88,11 @@ const resetProductSchema = async () => {
     console.log('- status, isDraft, draftExpiresAt (system fields)');
 
     console.log('\n' + '='.repeat(50));
-    console.log('✅ Product schema reset completed successfully!');
-    console.log('🚀 You can now create products with the new schema');
+    console.log('âœ… Product schema reset completed successfully!');
+    console.log('ðŸš€ You can now create products with the new schema');
 
   } catch (error) {
-    console.error('❌ Error resetting product schema:', error);
+    console.error('âŒ Error resetting product schema:', error);
   }
 };
 
@@ -103,12 +103,12 @@ const main = async () => {
   
   // Close database connection
   await mongoose.connection.close();
-  console.log('🔌 Database connection closed');
+  console.log('ðŸ”Œ Database connection closed');
   process.exit(0);
 };
 
 // Run the script
 main().catch(error => {
-  console.error('❌ Script error:', error);
+  console.error('âŒ Script error:', error);
   process.exit(1);
 });

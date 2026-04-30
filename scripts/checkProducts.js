@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
 require('dotenv').config();
@@ -6,10 +6,10 @@ require('dotenv').config();
 // Connect to database
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/easyshop');
-    console.log('✅ Connected to MongoDB');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/global-investments');
+    console.log('âœ… Connected to MongoDB');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('âŒ MongoDB connection error:', error);
     process.exit(1);
   }
 };
@@ -17,12 +17,12 @@ const connectDB = async () => {
 // Check products statistics
 const checkProducts = async () => {
   try {
-    console.log('\n📊 PRODUCT STATISTICS\n');
+    console.log('\nðŸ“Š PRODUCT STATISTICS\n');
     console.log('='.repeat(50));
 
     // Total products
     const totalProducts = await Product.countDocuments();
-    console.log(`📦 Total Products: ${totalProducts}`);
+    console.log(`ðŸ“¦ Total Products: ${totalProducts}`);
 
     // Products by status
     const productsByStatus = await Product.aggregate([
@@ -36,7 +36,7 @@ const checkProducts = async () => {
       { $sort: { count: -1 } }
     ]);
 
-    console.log('\n📈 Products by Status:');
+    console.log('\nðŸ“ˆ Products by Status:');
     productsByStatus.forEach(status => {
       console.log(`  ${status._id}: ${status.count} products (Total Value: ${status.totalValue.toFixed(2)})`);
     });
@@ -53,7 +53,7 @@ const checkProducts = async () => {
       { $sort: { count: -1 } }
     ]);
 
-    console.log('\n🏷️ Active Products by Category:');
+    console.log('\nðŸ·ï¸ Active Products by Category:');
     productsByCategory.forEach(category => {
       console.log(`  ${category._id}: ${category.count} products`);
     });
@@ -72,7 +72,7 @@ const checkProducts = async () => {
       { $limit: 10 }
     ]);
 
-    console.log('\n👥 Top 10 Sellers by Product Count:');
+    console.log('\nðŸ‘¥ Top 10 Sellers by Product Count:');
     for (const sellerStat of productsBySeller) {
       try {
         const seller = await Seller.findById(sellerStat._id);
@@ -89,7 +89,7 @@ const checkProducts = async () => {
       .limit(5)
       .populate('sellerId', 'shopName email');
 
-    console.log('\n🆕 5 Most Recent Products:');
+    console.log('\nðŸ†• 5 Most Recent Products:');
     recentProducts.forEach((product, index) => {
       const sellerName = product.sellerId ? (product.sellerId.shopName || product.sellerId.email) : 'Unknown Seller';
       console.log(`  ${index + 1}. "${product.title}" by ${sellerName} - ${product.currency} ${product.salePrice}`);
@@ -103,7 +103,7 @@ const checkProducts = async () => {
       draftExpiresAt: { $lte: new Date() }
     });
 
-    console.log('\n📝 Draft Statistics:');
+    console.log('\nðŸ“ Draft Statistics:');
     console.log(`  Total Drafts: ${totalDrafts}`);
     console.log(`  Expired Drafts: ${expiredDrafts}`);
     console.log(`  Active Drafts: ${totalDrafts - expiredDrafts}`);
@@ -124,7 +124,7 @@ const checkProducts = async () => {
 
     if (priceStats.length > 0) {
       const stats = priceStats[0];
-      console.log('\n💰 Price Statistics (Active Products):');
+      console.log('\nðŸ’° Price Statistics (Active Products):');
       console.log(`  Average Price: ${stats.avgPrice.toFixed(2)}`);
       console.log(`  Minimum Price: ${stats.minPrice.toFixed(2)}`);
       console.log(`  Maximum Price: ${stats.maxPrice.toFixed(2)}`);
@@ -132,10 +132,10 @@ const checkProducts = async () => {
     }
 
     console.log('\n' + '='.repeat(50));
-    console.log('✅ Product statistics completed successfully!');
+    console.log('âœ… Product statistics completed successfully!');
 
   } catch (error) {
-    console.error('❌ Error checking products:', error);
+    console.error('âŒ Error checking products:', error);
   }
 };
 
@@ -146,12 +146,12 @@ const main = async () => {
   
   // Close database connection
   await mongoose.connection.close();
-  console.log('🔌 Database connection closed');
+  console.log('ðŸ”Œ Database connection closed');
   process.exit(0);
 };
 
 // Run the script
 main().catch(error => {
-  console.error('❌ Script error:', error);
+  console.error('âŒ Script error:', error);
   process.exit(1);
 });

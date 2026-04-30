@@ -38,7 +38,7 @@ app.use(cors({
       'http://localhost:8081',
       'http://localhost:3002',
       'http://localhost:8082',
-      'https://eshopug.vercel.app',
+      'https://global-investments.vercel.app',
       process.env.FRONTEND_URL,
     ].filter(Boolean);
 

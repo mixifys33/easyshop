@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const Campaign = require('../models/Campaign');
 
@@ -30,7 +30,7 @@ router.get('/seller/:sellerId', async (req, res) => {
   }
 });
 
-// POST create campaign  — must be before /:id routes
+// POST create campaign  â€” must be before /:id routes
 router.post('/', async (req, res) => {
   try {
     const {
@@ -63,7 +63,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /active — public endpoint for the offers page (must be before /:id)
+// GET /active â€” public endpoint for the offers page (must be before /:id)
 router.get('/active', async (req, res) => {
   try {
     const now = new Date();
@@ -129,7 +129,7 @@ router.get('/active', async (req, res) => {
         endDate: c.endDate,
         appliesTo: c.appliesTo,
         products: mappedProducts,
-        shopName: seller?.shop?.shopName || 'EasyShop',
+        shopName: seller?.shop?.shopName || 'Global Investments',
         shopAvatar: seller?.profileImage?.url || seller?.shop?.logo?.url || null,
         productCount: mappedProducts.length,
       };
@@ -209,3 +209,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+

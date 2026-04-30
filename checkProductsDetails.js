@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const Product = require('./models/Product');
 const Seller = require('./models/Seller');
 
@@ -8,14 +8,14 @@ require('dotenv').config();
 // Database connection
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://easyshop:HackerX123456@cluster0.pv3uslj.mongodb.net/easyshop?retryWrites=true&w=majority&appName=Cluster0&ssl=true&tlsAllowInvalidCertificates=true';
+    const mongoUri = process.env.MONGODB_URI || 'process.env.MONGODB_URI || 'mongodb://localhost:27017/global-investments'';
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('✅ Connected to MongoDB');
+    console.log('âœ… Connected to MongoDB');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('âŒ MongoDB connection error:', error);
     process.exit(1);
   }
 };
@@ -23,14 +23,14 @@ const connectDB = async () => {
 // Check products and their details
 const checkProductsDetails = async () => {
   try {
-    console.log('\n🔍 CHECKING PRODUCTS DATABASE...\n');
+    console.log('\nðŸ” CHECKING PRODUCTS DATABASE...\n');
     
     // Get total product count
     const totalProducts = await Product.countDocuments();
-    console.log(`📊 Total Products: ${totalProducts}`);
+    console.log(`ðŸ“Š Total Products: ${totalProducts}`);
     
     if (totalProducts === 0) {
-      console.log('❌ No products found in database');
+      console.log('âŒ No products found in database');
       return;
     }
     
@@ -39,12 +39,12 @@ const checkProductsDetails = async () => {
     const inactiveProducts = await Product.countDocuments({ status: 'inactive' });
     const draftProducts = await Product.countDocuments({ status: 'draft' });
     
-    console.log(`📈 Active Products: ${activeProducts}`);
-    console.log(`📉 Inactive Products: ${inactiveProducts}`);
-    console.log(`📝 Draft Products: ${draftProducts}`);
+    console.log(`ðŸ“ˆ Active Products: ${activeProducts}`);
+    console.log(`ðŸ“‰ Inactive Products: ${inactiveProducts}`);
+    console.log(`ðŸ“ Draft Products: ${draftProducts}`);
     
     // Get products by category
-    console.log('\n📂 PRODUCTS BY CATEGORY:');
+    console.log('\nðŸ“‚ PRODUCTS BY CATEGORY:');
     const categoryStats = await Product.aggregate([
       { $match: { status: 'active' } },
       { $group: { 
@@ -61,7 +61,7 @@ const checkProductsDetails = async () => {
     });
     
     // Get products by subcategory
-    console.log('\n📁 PRODUCTS BY SUBCATEGORY:');
+    console.log('\nðŸ“ PRODUCTS BY SUBCATEGORY:');
     const subCategoryStats = await Product.aggregate([
       { $match: { status: 'active' } },
       { $group: { 
@@ -83,7 +83,7 @@ const checkProductsDetails = async () => {
     });
     const productsWithoutImages = activeProducts - productsWithImages;
     
-    console.log(`\n🖼️  PRODUCT IMAGES:`);
+    console.log(`\nðŸ–¼ï¸  PRODUCT IMAGES:`);
     console.log(`  Products with images: ${productsWithImages}`);
     console.log(`  Products without images: ${productsWithoutImages}`);
     
@@ -92,7 +92,7 @@ const checkProductsDetails = async () => {
     const lowStock = await Product.countDocuments({ status: 'active', stock: { $gt: 0, $lte: 10 } });
     const inStock = await Product.countDocuments({ status: 'active', stock: { $gt: 10 } });
     
-    console.log(`\n📦 STOCK LEVELS:`);
+    console.log(`\nðŸ“¦ STOCK LEVELS:`);
     console.log(`  Out of stock: ${outOfStock}`);
     console.log(`  Low stock (1-10): ${lowStock}`);
     console.log(`  In stock (>10): ${inStock}`);
@@ -111,7 +111,7 @@ const checkProductsDetails = async () => {
     
     if (priceStats.length > 0) {
       const stats = priceStats[0];
-      console.log(`\n💰 PRICE ANALYSIS:`);
+      console.log(`\nðŸ’° PRICE ANALYSIS:`);
       console.log(`  Average Price: UGX ${Math.round(stats.avgPrice).toLocaleString()}`);
       console.log(`  Lowest Price: UGX ${Math.round(stats.minPrice).toLocaleString()}`);
       console.log(`  Highest Price: UGX ${Math.round(stats.maxPrice).toLocaleString()}`);
@@ -119,7 +119,7 @@ const checkProductsDetails = async () => {
     }
     
     // Recent products
-    console.log(`\n🆕 RECENT PRODUCTS (Last 10):`);
+    console.log(`\nðŸ†• RECENT PRODUCTS (Last 10):`);
     const recentProducts = await Product.find({ status: 'active' })
       .sort({ createdAt: -1 })
       .limit(10)
@@ -137,7 +137,7 @@ const checkProductsDetails = async () => {
     });
     
     // Products without proper data
-    console.log(`\n⚠️  DATA QUALITY ISSUES:`);
+    console.log(`\nâš ï¸  DATA QUALITY ISSUES:`);
     
     const noDescription = await Product.countDocuments({ 
       status: 'active',
@@ -177,7 +177,7 @@ const checkProductsDetails = async () => {
     console.log(`  Products with invalid prices: ${invalidPrices}`);
     
     // Seller analysis
-    console.log(`\n👥 SELLER ANALYSIS:`);
+    console.log(`\nðŸ‘¥ SELLER ANALYSIS:`);
     const sellerStats = await Product.aggregate([
       { $match: { status: 'active' } },
       { $group: {
@@ -203,27 +203,27 @@ const checkProductsDetails = async () => {
       console.log(`    ${index + 1}. ${sellerName}: ${seller.productCount} products, Avg Price: UGX ${Math.round(seller.avgPrice).toLocaleString()}`);
     });
     
-    console.log('\n✅ Product analysis complete!');
+    console.log('\nâœ… Product analysis complete!');
     
   } catch (error) {
-    console.error('❌ Error checking products:', error);
+    console.error('âŒ Error checking products:', error);
   }
 };
 
 // Test related products functionality
 const testRelatedProducts = async () => {
   try {
-    console.log('\n🔗 TESTING RELATED PRODUCTS FUNCTIONALITY...\n');
+    console.log('\nðŸ”— TESTING RELATED PRODUCTS FUNCTIONALITY...\n');
     
     // Get a sample product
     const sampleProduct = await Product.findOne({ status: 'active' });
     
     if (!sampleProduct) {
-      console.log('❌ No active products found for testing');
+      console.log('âŒ No active products found for testing');
       return;
     }
     
-    console.log(`📱 Testing with product: ${sampleProduct.title}`);
+    console.log(`ðŸ“± Testing with product: ${sampleProduct.title}`);
     console.log(`   Category: ${sampleProduct.category}`);
     console.log(`   SubCategory: ${sampleProduct.subCategory}`);
     
@@ -267,7 +267,7 @@ const testRelatedProducts = async () => {
       }}
     ]);
     
-    console.log(`\n🎯 Found ${relatedProducts.length} related products:`);
+    console.log(`\nðŸŽ¯ Found ${relatedProducts.length} related products:`);
     
     relatedProducts.forEach((product, index) => {
       const matchType = product.totalScore === 30 ? 'Exact Match (Same Category + SubCategory)' :
@@ -287,14 +287,14 @@ const testRelatedProducts = async () => {
     const categoryMatches = relatedProducts.filter(p => p.totalScore === 10).length;
     const noMatches = relatedProducts.filter(p => p.totalScore === 0).length;
     
-    console.log(`📊 Match Summary:`);
+    console.log(`ðŸ“Š Match Summary:`);
     console.log(`   Exact matches (same category + subcategory): ${exactMatches}`);
     console.log(`   SubCategory matches: ${subCategoryMatches}`);
     console.log(`   Category matches: ${categoryMatches}`);
     console.log(`   No category matches: ${noMatches}`);
     
   } catch (error) {
-    console.error('❌ Error testing related products:', error);
+    console.error('âŒ Error testing related products:', error);
   }
 };
 
@@ -304,14 +304,14 @@ const main = async () => {
   await checkProductsDetails();
   await testRelatedProducts();
   
-  console.log('\n🏁 Analysis complete! Closing database connection...');
+  console.log('\nðŸ Analysis complete! Closing database connection...');
   await mongoose.connection.close();
   process.exit(0);
 };
 
 // Handle errors
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Promise Rejection:', err);
+  console.error('âŒ Unhandled Promise Rejection:', err);
   process.exit(1);
 });
 

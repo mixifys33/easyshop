@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+﻿const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // Create transporter using Gmail SMTP
@@ -44,7 +44,7 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${isPasswordReset ? 'Reset Your Password' : 'Welcome to EasyShop!'}</title>
+        <title>${isPasswordReset ? 'Reset Your Password' : 'Welcome to Global Investments!'}</title>
         <style>
             * {
                 margin: 0;
@@ -156,7 +156,7 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
                 font-size: 16px;
             }
             .feature-list li:before {
-                content: "🛍️";
+                content: "ðŸ›ï¸";
                 position: absolute;
                 left: 0;
                 font-size: 18px;
@@ -222,54 +222,54 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
     <body>
         <div class="container">
             <div class="header">
-                <div class="logo">🛍️</div>
-                <h1>EasyShop</h1>
-                <p>${isPasswordReset ? 'Secure Password Reset' : 'Welcome to Your Shopping Journey!'}</p>
+                <div class="logo">ðŸ›ï¸</div>
+                <h1>Global Investments</h1>
+                <p>${isPasswordReset ? 'Secure Password Reset' : 'Welcome to Your Investment Journey!'}</p>
             </div>
             
             <div class="content">
                 <div class="greeting">
-                    Hello ${name || 'Valued Customer'}! 👋
+                    Hello ${name || 'Valued Customer'}! ðŸ‘‹
                 </div>
                 
                 ${isPasswordReset ? `
-                <p>We received a request to reset your password for your EasyShop account. Use the verification code below to create a new password and regain access to your account.</p>
+                <p>We received a request to reset your password for your Global Investments account. Use the verification code below to create a new password and regain access to your account.</p>
                 ` : `
-                <p>Welcome to <strong>EasyShop</strong> - your gateway to amazing products and great deals! We're excited to have you join our community of happy shoppers.</p>
+                <p>Welcome to <strong>Global Investments</strong> - your gateway to global investment opportunities! We're excited to have you join our community of smart investors.</p>
                 `}
                 
                 <div class="otp-section">
                     <div class="otp-title">${isPasswordReset ? 'Password Reset Code' : 'Your Verification Code'}</div>
                     <div class="otp-code">${otp}</div>
-                    <div class="otp-validity">⏰ Valid for 10 minutes</div>
+                    <div class="otp-validity">â° Valid for 10 minutes</div>
                 </div>
                 
                 ${isPasswordReset ? `
                 <div class="security-notice">
-                    <h4>🔒 Security Notice</h4>
+                    <h4>ðŸ”’ Security Notice</h4>
                     <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged. For your security, this code will expire in 10 minutes.</p>
                 </div>
                 ` : `
                 <div class="welcome-section">
-                    <h3>🎉 Welcome to EasyShop!</h3>
+                    <h3>ðŸŽ‰ Welcome to Global Investments!</h3>
                     <p>You're about to discover amazing products, great deals, and a seamless shopping experience!</p>
                 </div>
                 
                 <div class="features">
-                    <h3>What You'll Love About EasyShop:</h3>
+                    <h3>What You'll Love About Global Investments:</h3>
                     <ul class="feature-list">
-                        <li>Thousands of quality products at great prices</li>
-                        <li>Fast and secure checkout process</li>
-                        <li>Multiple payment options for your convenience</li>
-                        <li>Quick delivery right to your doorstep</li>
+                        <li>Diverse investment opportunities worldwide</li>
+                        <li>Expert-guided investment strategies</li>
+                        <li>Multiple asset classes to diversify your portfolio</li>
+                        <li>Real-time market insights and analytics</li>
                         <li>24/7 customer support when you need help</li>
-                        <li>Exclusive deals and discounts for members</li>
+                        <li>Exclusive investment reports for members</li>
                     </ul>
                 </div>
                 
                 <div class="cta">
-                    <h3>🛒 Ready to Start Shopping?</h3>
-                    <p>Complete your verification and explore thousands of amazing products waiting for you!</p>
+                    <h3>ðŸ›’ Ready to Start Investing?</h3>
+                    <p>Complete your verification and explore global investment opportunities!</p>
                 </div>
                 `}
                 
@@ -279,12 +279,12 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
             </div>
             
             <div class="footer">
-                <div class="brand">🛍️ EasyShop</div>
-                <p>Your Trusted Shopping Partner</p>
-                <p>📧 support@easyshop.com | 📞 Customer Support</p>
+                <div class="brand">ðŸ›ï¸ Global Investments</div>
+                <p>Your Trusted Investment Partner</p>
+                <p>ðŸ“§ support@Global Investments.com | ðŸ“ž Customer Support</p>
                
                 <p style="margin-top: 25px; font-size: 14px; opacity: 0.6;">
-                    © 2024 EasyShop. All rights reserved.<br>
+                    Â© 2025 Global Investments. All rights reserved.<br>
                     This email was sent to ${email}
                 </p>
             </div>
@@ -295,34 +295,34 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
 
   const mailOptions = {
     from: {
-      name: 'EasyShop',
+      name: 'Global Investments',
       address: process.env.SMTP_USER
     },
     to: email,
     subject: isPasswordReset ? 
-      '🔐 Reset Your EasyShop Password - Secure Access Code' : 
-      '🛍️ Welcome to EasyShop - Verify Your Account!',
+      'ðŸ” Reset Your Global Investments Password - Secure Access Code' : 
+      'ðŸ›ï¸ Welcome to Global Investments - Verify Your Account!',
     html: htmlTemplate,
     text: `
-Hello ${name || (isPasswordReset ? 'Valued Customer' : 'New Shopper')}!
+Hello ${name || (isPasswordReset ? 'Valued Customer' : 'New Investor')}!
 
 ${isPasswordReset ? 
-  `We received a request to reset your password for your EasyShop account.` :
-  `Welcome to EasyShop! We're excited to have you join our community of happy shoppers.`
+  `We received a request to reset your password for your Global Investments account.` :
+  `Welcome to Global Investments! We're excited to have you join our community of smart investors.`
 }
 
 Your ${isPasswordReset ? 'password reset' : 'verification'} code is: ${otp}
 
 This code is valid for 10 minutes. ${isPasswordReset ? 
   'Enter it to reset your password.' : 
-  'Enter it to complete your account setup and start shopping!'
+  'Enter it to complete your account setup and start investing!'
 }
 
 ${isPasswordReset ? 
   `If you didn't request a password reset, please ignore this email.` :
   `You're about to discover:
-- Thousands of quality products at great prices
-- Fast and secure checkout process
+- Diverse investment opportunities worldwide
+- Expert-guided investment strategies
 - Multiple payment options
 - Quick delivery to your doorstep
 - 24/7 customer support
@@ -331,8 +331,8 @@ ${isPasswordReset ?
 
 Need help? Contact our customer support team.
 
-Happy Shopping!
-The EasyShop Team
+Happy Investing!
+The Global Investments Team
     `
   };
 
@@ -354,7 +354,7 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${isPasswordReset ? 'Reset Your Password' : 'Verify Your AllOut Gadgets Seller Account'}</title>
+        <title>${isPasswordReset ? 'Reset Your Password' : 'Verify Your Global Investments advisor account'}</title>
         <style>
             * {
                 margin: 0;
@@ -458,7 +458,7 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
                 color: #555;
             }
             .feature-list li:before {
-                content: "✅";
+                content: "âœ…";
                 position: absolute;
                 left: 0;
             }
@@ -525,53 +525,53 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
     <body>
         <div class="container">
             <div class="header">
-                <h1>${isPasswordReset ? '🔐' : '🏪'} AllOut Gadgets</h1>
-                <p>${isPasswordReset ? 'Secure Password Reset' : 'Your Journey to Successful trading Starts Here'}</p>
+                <h1>${isPasswordReset ? 'ðŸ”' : 'ðŸª'} Global Investments</h1>
+                <p>${isPasswordReset ? 'Secure Password Reset' : 'Your Journey to Successful Investing Starts Here'}</p>
             </div>
             
             <div class="content">
                 <div class="greeting">
-                    Hello ${name || 'Valued Seller'}! 👋
+                    Hello ${name || 'Valued Advisor'}! ðŸ‘‹
                 </div>
                 
                 ${isPasswordReset ? `
-                <p>We received a request to reset your password for your EasyShop seller account. Use the verification code below to proceed with resetting your password.</p>
+                <p>We received a request to reset your password for your Global Investments advisor account. Use the verification code below to proceed with resetting your password.</p>
                 ` : `
-                <p>Welcome to <strong>EasyShop</strong> - where businesses become profitable realities! We're thrilled that you've chosen to start your entrepreneurial journey with us.</p>
+                <p>Welcome to <strong>Global Investments</strong> - where investment dreams become profitable realities! We're thrilled that you've chosen to start your entrepreneurial journey with us.</p>
                 `}
                 
                 <div class="otp-section">
                     <div class="otp-title">${isPasswordReset ? 'Password Reset Code' : 'Your Verification Code'}</div>
                     <div class="otp-code">${otp}</div>
-                    <div class="otp-validity">⏰ Valid for 10 minutes</div>
+                    <div class="otp-validity">â° Valid for 10 minutes</div>
                 </div>
                 
                 ${isPasswordReset ? `
                 <div class="security-notice">
-                    <h4>🔒 Security Notice</h4>
+                    <h4>ðŸ”’ Security Notice</h4>
                     <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged. For your security, this code will expire in 10 minutes.</p>
                 </div>
                 ` : `
                 <div class="motivation">
-                    <h3>🚀 You're About to Join Something Amazing!</h3>
+                    <h3>ðŸš€ You're About to Join Something Amazing!</h3>
                     <p>Thousands of sellers are already building their empires with us. Your success story starts today!</p>
                 </div>
                 
                 <div class="features">
                     <h3>What Awaits You:</h3>
                     <ul class="feature-list">
-                        <li>Reach millions of customers across Uganda and beyond</li>
-                        <li>Easy-to-use seller dashboard with powerful analytics</li>
-                        <li>Multiple payment options including Mobile Money</li>
-                        <li>24/7 seller support to help you succeed</li>
-                        <li>Marketing tools to boost your sales</li>
+                        <li>Connect with investors and opportunities worldwide</li>
+                        <li>Easy-to-use advisor dashboard with powerful analytics</li>
+                        <li>Multiple asset classes and investment vehicles</li>
+                        <li>24/7 investment support to help you succeed</li>
+                        <li>Research tools to boost your portfolio</li>
                         <li>Secure and fast payment processing</li>
                     </ul>
                 </div>
                 
                 <div class="cta">
-                    <h3>💰 Ready to Start Earning?</h3>
-                    <p>Complete your verification and set up your shop in the next few minutes. Your first sale could be just hours away!</p>
+                    <h3>ðŸ’° Ready to Grow Your Wealth?</h3>
+                    <p>Complete your verification and set up your advisor profile. Your first investment could be just hours away!</p>
                 </div>
                 `}
                 
@@ -581,11 +581,11 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
             </div>
             
             <div class="footer">
-                <p><strong>EasyShop</strong> - Empowering Entrepreneurs</p>
-                <p>📧 support@easyshop.com | 📞 +256761819885</p>
+                <p><strong>Global Investments</strong> - Empowering Investors Worldwide</p>
+                <p>ðŸ“§ support@Global Investments.com | ðŸ“ž +1 (800) INVEST-1</p>
                
                 <p style="margin-top: 20px; font-size: 12px; opacity: 0.6;">
-                    © 2024 EasyShop. All rights reserved.<br>
+                    Â© 2025 Global Investments. All rights reserved.<br>
                     This email was sent to ${email}
                 </p>
             </div>
@@ -596,27 +596,27 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
 
   const mailOptions = {
     from: {
-      name: 'EasyShop',
+      name: 'Global Investments',
       address: process.env.SMTP_USER
     },
     to: email,
     subject: isPasswordReset ? 
-      '🔐 Reset Your EasyShop Password - Secure Access Code' : 
-      '🔐 Verify Your EasyShop Seller Account - Your Success Journey Begins!',
+      'ðŸ” Reset Your Global Investments Password - Secure Access Code' : 
+      'ðŸ” Verify Your Global Investments advisor account - Your Investment Journey Begins!',
     html: htmlTemplate,
     text: `
-Hello ${name || (isPasswordReset ? 'Valued Seller' : 'Future Entrepreneur')}!
+Hello ${name || (isPasswordReset ? 'Valued Advisor' : 'Future Investor')}!
 
 ${isPasswordReset ? 
-  `We received a request to reset your password for your EasyShop seller account.` :
-  `Welcome to EasyShop! `
+  `We received a request to reset your password for your Global Investments advisor account.` :
+  `Welcome to Global Investments! `
 }
 
 Your ${isPasswordReset ? 'password reset' : 'verification'} code is: ${otp}
 
 This code is valid for 10 minutes. ${isPasswordReset ? 
   'Enter it to reset your password.' : 
-  'Enter it to complete your seller account setup.'
+  'Enter it to complete your advisor account setup.'
 }
 
 ${isPasswordReset ? 
@@ -634,7 +634,7 @@ What awaits you:
 Need help? Contact us by replying to the email. 
 
 Best regards,
-The EasyShop Team
+The Global Investments Team
     `
   };
 
@@ -656,7 +656,7 @@ const sendUserWelcomeEmail = async (email, name) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to EasyShop!</title>
+        <title>Welcome to Global Investments!</title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f8fafc; }
@@ -677,22 +677,22 @@ const sendUserWelcomeEmail = async (email, name) => {
     <body>
         <div class="container">
             <div class="header">
-                <div class="logo">🛍️</div>
-                <h1>Welcome to EasyShop!</h1>
+                <div class="logo">ðŸ›ï¸</div>
+                <h1>Welcome to Global Investments!</h1>
                 <p>Your account is now active and ready</p>
             </div>
             
             <div class="content">
-                <h2>Congratulations, ${name}! 🎉</h2>
-                <p>Your EasyShop account has been successfully verified and activated. You're now part of our amazing shopping community!</p>
+                <h2>Congratulations, ${name}! ðŸŽ‰</h2>
+                <p>Your Global Investments account has been successfully verified and activated. You're now part of our amazing shopping community!</p>
                 
                 <div class="success-badge">
-                    <h3>✅ Account Verified Successfully</h3>
+                    <h3>âœ… Account Verified Successfully</h3>
                     <p>You can now start shopping and enjoying great deals!</p>
                 </div>
                 
                 <div class="next-steps">
-                    <h3>🛒 Start Your Shopping Journey:</h3>
+                    <h3>ðŸ›’ Start Your Shopping Journey:</h3>
                     <div class="step">
                         <span class="step-number">1</span>
                         <strong>Browse Products</strong> - Explore thousands of amazing products in all categories
@@ -714,16 +714,16 @@ const sendUserWelcomeEmail = async (email, name) => {
                 <p><strong>Pro Tip:</strong> Check out our daily deals and exclusive member discounts for the best savings!</p>
                 
                 <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 25px; border-radius: 16px; text-align: center; margin: 25px 0;">
-                    <h3>🎁 Special Welcome Offer</h3>
+                    <h3>ðŸŽ Special Welcome Offer</h3>
                     <p>Get 10% off your first order with code: <strong>WELCOME10</strong></p>
                 </div>
             </div>
             
             <div class="footer">
-                <div class="brand">🛍️ EasyShop</div>
-                <p><strong>Ready to start shopping?</strong></p>
+                <div class="brand">ðŸ›ï¸ Global Investments</div>
+                <p><strong>Ready to Start Investing?</strong></p>
                 <p>Login to your account and discover amazing deals!</p>
-                <p style="margin-top: 20px;">📧 support@easyshop.com | 📞 Customer Support</p>
+                <p style="margin-top: 20px;">ðŸ“§ support@Global Investments.com | ðŸ“ž Customer Support</p>
             </div>
         </div>
     </body>
@@ -732,11 +732,11 @@ const sendUserWelcomeEmail = async (email, name) => {
 
   const mailOptions = {
     from: {
-      name: 'EasyShop',
+      name: 'Global Investments',
       address: process.env.SMTP_USER
     },
     to: email,
-    subject: '🎉 Welcome to EasyShop - Your Shopping Journey Begins!',
+    subject: 'ðŸŽ‰ Welcome to Global Investments - Your Shopping Journey Begins!',
     html: htmlTemplate
   };
 
@@ -756,7 +756,7 @@ const sendWelcomeEmail = async (email, name) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to AllOut Gadgets!</title>
+        <title>Welcome to Global Investments!</title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f8f9fa; }
@@ -775,21 +775,21 @@ const sendWelcomeEmail = async (email, name) => {
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎉 Welcome to EasyShop!</h1>
-                <p>Your seller account is now active</p>
+                <h1>ðŸŽ‰ Welcome to Global Investments!</h1>
+                <p>Your advisor account is now active</p>
             </div>
             
             <div class="content">
-                <h2>Congratulations, ${name}! 🚀</h2>
-                <p>Your seller account has been successfully verified and activated. You're now part of the EasyShop family!</p>
+                <h2>Congratulations, ${name}! ðŸš€</h2>
+                <p>Your advisor account has been successfully verified and activated. You're now part of the Global Investments family!</p>
                 
                 <div class="success-badge">
-                    <h3>✅ Account Verified Successfully</h3>
+                    <h3>âœ… Account Verified Successfully</h3>
                     <p>You can now start selling and earning money!</p>
                 </div>
                 
                 <div class="next-steps">
-                    <h3>🎯 Next Steps to Success:</h3>
+                    <h3>ðŸŽ¯ Next Steps to Success:</h3>
                     <div class="step">
                         <span class="step-number">1</span>
                         <strong>Complete Your Shop Setup</strong> - Add your shop details, logo, and description
@@ -814,7 +814,7 @@ const sendWelcomeEmail = async (email, name) => {
             <div class="footer">
                 <p><strong>Ready to start your success story?</strong></p>
                 <p>Login to your seller dashboard and begin your journey!</p>
-                <p style="margin-top: 20px;">📧 support@easyshop.com | 📞 +256761819885</p>
+                <p style="margin-top: 20px;">ðŸ“§ support@Global Investments.com | ðŸ“ž +1 (800) INVEST-1</p>
             </div>
         </div>
     </body>
@@ -823,11 +823,11 @@ const sendWelcomeEmail = async (email, name) => {
 
   const mailOptions = {
     from: {
-      name: 'EasyShop',
+      name: 'Global Investments',
       address: process.env.SMTP_USER
     },
     to: email,
-    subject: '🎉 Welcome to EasyShop - Your Success Journey Begins Now!',
+    subject: 'ðŸŽ‰ Welcome to Global Investments - Your Success Journey Begins Now!',
     html: htmlTemplate
   };
 
@@ -841,7 +841,7 @@ const sendWelcomeEmail = async (email, name) => {
   }
 };
 
-// ─── ORDER CONFIRMATION EMAIL (to buyer) ────────────────────────────────────
+// â”€â”€â”€ ORDER CONFIRMATION EMAIL (to buyer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const sendOrderConfirmationToUser = async (email, userName, order) => {
   const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
   const total = (order.subtotal || 0) + (order.deliveryFee || 0);
@@ -855,7 +855,7 @@ const sendOrderConfirmationToUser = async (email, userName, order) => {
         <span style="color:#888;font-size:13px;">Qty: ${i.quantity}</span>
       </td>
       <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#27ae60;">
-        UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
+        USD ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
       </td>
     </tr>`).join('');
 
@@ -866,12 +866,12 @@ const sendOrderConfirmationToUser = async (email, userName, order) => {
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#27ae60,#2ecc71);padding:36px 30px;text-align:center;color:#fff;">
-      <div style="font-size:48px;">🛍️</div>
+      <div style="font-size:48px;">ðŸ›ï¸</div>
       <h1 style="margin:10px 0 4px;">Order Confirmed!</h1>
-      <p style="opacity:.9;font-size:16px;">Thank you for shopping with EasyShop</p>
+      <p style="opacity:.9;font-size:16px;">Thank you for investing with Global Investments</p>
     </div>
     <div style="padding:30px;">
-      <p style="font-size:16px;color:#333;">Hi <strong>${userName || 'Valued Customer'}</strong> 👋</p>
+      <p style="font-size:16px;color:#333;">Hi <strong>${userName || 'Valued Customer'}</strong> ðŸ‘‹</p>
       <p style="color:#555;">Your order has been placed successfully. Here are your order details:</p>
 
       <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #27ae60;">
@@ -886,33 +886,33 @@ const sendOrderConfirmationToUser = async (email, userName, order) => {
 
       <div style="background:#f0faf4;border-radius:10px;padding:16px;margin-top:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:#666;">Subtotal</span><span>UGX ${(order.subtotal || 0).toLocaleString()}</span>
+          <span style="color:#666;">Subtotal</span><span>USD ${(order.subtotal || 0).toLocaleString()}</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:#666;">Delivery Fee</span><span>UGX ${(order.deliveryFee || 0).toLocaleString()}</span>
+          <span style="color:#666;">Delivery Fee</span><span>USD ${(order.deliveryFee || 0).toLocaleString()}</span>
         </div>
         <div style="display:flex;justify-content:space-between;border-top:1px solid #d5f0e0;padding-top:10px;margin-top:6px;">
-          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#27ae60;">UGX ${total.toLocaleString()}</strong>
+          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#27ae60;">USD ${total.toLocaleString()}</strong>
         </div>
       </div>
 
       ${proofHtml ? `<div style="margin-top:20px;"><h3 style="color:#333;margin-bottom:10px;">Payment Proof Submitted</h3><div>${proofHtml}</div></div>` : ''}
 
       <div style="background:#fff3cd;border-radius:10px;padding:16px;margin-top:20px;border-left:4px solid #f39c12;">
-        <p style="margin:0;color:#856404;font-size:14px;">📦 Your order is being reviewed by the seller. You'll receive updates as it progresses.</p>
+        <p style="margin:0;color:#856404;font-size:14px;">ðŸ“¦ Your order is being reviewed by the seller. You'll receive updates as it progresses.</p>
       </div>
     </div>
     <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
-      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
-      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">ðŸ›ï¸ Global Investments</p>
+      <p style="opacity:.7;font-size:13px;">Â© 2025 Global Investments. All rights reserved.</p>
     </div>
   </div></body></html>`;
 
   try {
     const info = await transporter.sendMail({
-      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      from: { name: 'Global Investments', address: process.env.SMTP_USER },
       to: email,
-      subject: `✅ Order Confirmed ${orderId} — EasyShop`,
+      subject: `âœ… Order Confirmed ${orderId} â€” Global Investments`,
       html,
     });
     console.log('[email] Order confirmation sent to user:', info.messageId);
@@ -923,7 +923,7 @@ const sendOrderConfirmationToUser = async (email, userName, order) => {
   }
 };
 
-// ─── NEW ORDER NOTIFICATION EMAIL (to seller) ────────────────────────────────
+// â”€â”€â”€ NEW ORDER NOTIFICATION EMAIL (to seller) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) => {
   const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
   const total = (order.subtotal || 0) + (order.deliveryFee || 0);
@@ -934,10 +934,10 @@ const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) =
       </td>
       <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
         <strong>${i.name}</strong><br/>
-        <span style="color:#888;font-size:13px;">Qty: ${i.quantity} × UGX ${(i.price || 0).toLocaleString()}</span>
+        <span style="color:#888;font-size:13px;">Qty: ${i.quantity} Ã— USD ${(i.price || 0).toLocaleString()}</span>
       </td>
       <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#3498db;">
-        UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
+        USD ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}
       </td>
     </tr>`).join('');
 
@@ -948,12 +948,12 @@ const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) =
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#3498db,#2980b9);padding:36px 30px;text-align:center;color:#fff;">
-      <div style="font-size:48px;">🔔</div>
+      <div style="font-size:48px;">ðŸ””</div>
       <h1 style="margin:10px 0 4px;">New Order Received!</h1>
       <p style="opacity:.9;font-size:16px;">You have a new order to fulfill</p>
     </div>
     <div style="padding:30px;">
-      <p style="font-size:16px;color:#333;">Hi <strong>${sellerName || 'Seller'}</strong> 👋</p>
+      <p style="font-size:16px;color:#333;">Hi <strong>${sellerName || 'Seller'}</strong> ðŸ‘‹</p>
       <p style="color:#555;">Great news! A customer has placed an order from your shop. Please review and process it promptly.</p>
 
       <div style="background:#ebf5fb;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #3498db;">
@@ -971,33 +971,33 @@ const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) =
 
       <div style="background:#ebf5fb;border-radius:10px;padding:16px;margin-top:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:#666;">Subtotal</span><span>UGX ${(order.subtotal || 0).toLocaleString()}</span>
+          <span style="color:#666;">Subtotal</span><span>USD ${(order.subtotal || 0).toLocaleString()}</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:#666;">Delivery Fee</span><span>UGX ${(order.deliveryFee || 0).toLocaleString()}</span>
+          <span style="color:#666;">Delivery Fee</span><span>USD ${(order.deliveryFee || 0).toLocaleString()}</span>
         </div>
         <div style="display:flex;justify-content:space-between;border-top:1px solid #aed6f1;padding-top:10px;margin-top:6px;">
-          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#3498db;">UGX ${total.toLocaleString()}</strong>
+          <strong style="font-size:16px;">Total</strong><strong style="font-size:16px;color:#3498db;">USD ${total.toLocaleString()}</strong>
         </div>
       </div>
 
       ${proofHtml ? `<div style="margin-top:20px;"><h3 style="color:#333;margin-bottom:10px;">Payment Proof from Customer</h3><div>${proofHtml}</div></div>` : ''}
 
       <div style="background:#d5f5e3;border-radius:10px;padding:16px;margin-top:20px;border-left:4px solid #27ae60;">
-        <p style="margin:0;color:#1e8449;font-size:14px;font-weight:600;">⚡ Action Required: Please process this order and update its status in your seller dashboard.</p>
+        <p style="margin:0;color:#1e8449;font-size:14px;font-weight:600;">âš¡ Action Required: Please process this order and update its status in your seller dashboard.</p>
       </div>
     </div>
     <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
-      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🏪 EasyShop Seller Portal</p>
-      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">ðŸª Global Investments Seller Portal</p>
+      <p style="opacity:.7;font-size:13px;">Â© 2025 Global Investments. All rights reserved.</p>
     </div>
   </div></body></html>`;
 
   try {
     const info = await transporter.sendMail({
-      from: { name: 'EasyShop Orders', address: process.env.SMTP_USER },
+      from: { name: 'Global Investments Orders', address: process.env.SMTP_USER },
       to: sellerEmail,
-      subject: `🔔 New Order ${orderId} — Action Required`,
+      subject: `ðŸ”” New Order ${orderId} â€” Action Required`,
       html,
     });
     console.log('[email] New order notification sent to seller:', info.messageId);
@@ -1008,7 +1008,7 @@ const sendNewOrderToSeller = async (sellerEmail, sellerName, order, buyerName) =
   }
 };
 
-// ─── ORDER CANCELLATION / REFUND EMAIL (to seller) ───────────────────────────
+// â”€â”€â”€ ORDER CANCELLATION / REFUND EMAIL (to seller) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerName, buyerEmail) => {
   const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
   const total = (order.subtotal || 0) + (order.deliveryFee || 0);
@@ -1016,15 +1016,15 @@ const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerNam
     <tr>
       <td style="padding:10px;border-bottom:1px solid #f0f0f0;"><strong>${i.name}</strong></td>
       <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:center;">${i.quantity}</td>
-      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;">UGX ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}</td>
+      <td style="padding:10px;border-bottom:1px solid #f0f0f0;text-align:right;">USD ${((i.price || 0) * (i.quantity || 1)).toLocaleString()}</td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#e74c3c,#c0392b);padding:36px 30px;text-align:center;color:#fff;">
-      <div style="font-size:48px;">❌</div>
+      <div style="font-size:48px;">âŒ</div>
       <h1 style="margin:10px 0 4px;">Order Cancelled</h1>
-      <p style="opacity:.9;font-size:16px;">A customer has cancelled their order — refund required</p>
+      <p style="opacity:.9;font-size:16px;">A customer has cancelled their order â€” refund required</p>
     </div>
     <div style="padding:30px;">
       <p style="font-size:16px;color:#333;">Hi <strong>${sellerName || 'Seller'}</strong>,</p>
@@ -1036,7 +1036,7 @@ const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerNam
         <p style="margin:0 0 6px;"><strong>Customer Email:</strong> ${buyerEmail || order.buyerInfo?.email || 'N/A'}</p>
         <p style="margin:0 0 6px;"><strong>Customer Phone:</strong> ${order.buyerInfo?.phone || order.customerInfo?.phone || 'N/A'}</p>
         <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
-        <p style="margin:0;"><strong>Amount to Refund:</strong> <span style="color:#e74c3c;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+        <p style="margin:0;"><strong>Amount to Refund:</strong> <span style="color:#e74c3c;font-weight:700;font-size:16px;">USD ${total.toLocaleString()}</span></p>
       </div>
 
       <h3 style="color:#333;margin-bottom:12px;">Cancelled Items</h3>
@@ -1050,29 +1050,29 @@ const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerNam
       </table>
 
       <div style="background:#fff3cd;border-radius:12px;padding:20px;margin-top:20px;border-left:4px solid #f39c12;">
-        <h3 style="color:#856404;margin-bottom:12px;">⚠️ Refund Process — Action Required</h3>
+        <h3 style="color:#856404;margin-bottom:12px;">âš ï¸ Refund Process â€” Action Required</h3>
         <ol style="color:#856404;padding-left:20px;line-height:2;">
           <li>Contact the customer at <strong>${buyerEmail || order.buyerInfo?.email || 'N/A'}</strong> or <strong>${order.buyerInfo?.phone || order.customerInfo?.phone || 'N/A'}</strong></li>
-          <li>Confirm the payment amount received: <strong>UGX ${total.toLocaleString()}</strong></li>
+          <li>Confirm the payment amount received: <strong>USD ${total.toLocaleString()}</strong></li>
           <li>Initiate the refund via the same payment method used: <strong>${order.paymentMethod?.toUpperCase() || 'N/A'}</strong></li>
-          <li>Complete the refund within <strong>3–5 business days</strong></li>
+          <li>Complete the refund within <strong>3â€“5 business days</strong></li>
           <li>Notify the customer once the refund has been sent</li>
         </ol>
       </div>
 
-      <p style="color:#888;font-size:13px;margin-top:20px;">If you have any questions about this cancellation, please contact EasyShop support.</p>
+      <p style="color:#888;font-size:13px;margin-top:20px;">If you have any questions about this cancellation, please contact Global Investments support.</p>
     </div>
     <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
-      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🏪 EasyShop Seller Portal</p>
-      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">ðŸª Global Investments Seller Portal</p>
+      <p style="opacity:.7;font-size:13px;">Â© 2025 Global Investments. All rights reserved.</p>
     </div>
   </div></body></html>`;
 
   try {
     const info = await transporter.sendMail({
-      from: { name: 'EasyShop Orders', address: process.env.SMTP_USER },
+      from: { name: 'Global Investments Orders', address: process.env.SMTP_USER },
       to: sellerEmail,
-      subject: `❌ Order Cancelled ${orderId} — Refund Required`,
+      subject: `âŒ Order Cancelled ${orderId} â€” Refund Required`,
       html,
     });
     console.log('[email] Cancellation/refund email sent to seller:', info.messageId);
@@ -1083,7 +1083,7 @@ const sendCancellationToSeller = async (sellerEmail, sellerName, order, buyerNam
   }
 };
 
-// ─── CANCELLATION CONFIRMATION EMAIL (to buyer) ──────────────────────────────
+// â”€â”€â”€ CANCELLATION CONFIRMATION EMAIL (to buyer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const sendCancellationToUser = async (email, userName, order) => {
   const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
   const total = (order.subtotal || 0) + (order.deliveryFee || 0);
@@ -1091,7 +1091,7 @@ const sendCancellationToUser = async (email, userName, order) => {
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#f39c12,#e67e22);padding:36px 30px;text-align:center;color:#fff;">
-      <div style="font-size:48px;">🔄</div>
+      <div style="font-size:48px;">ðŸ”„</div>
       <h1 style="margin:10px 0 4px;">Order Cancelled</h1>
       <p style="opacity:.9;font-size:16px;">Your refund is being processed</p>
     </div>
@@ -1102,32 +1102,32 @@ const sendCancellationToUser = async (email, userName, order) => {
       <div style="background:#fef9ec;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #f39c12;">
         <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
         <p style="margin:0 0 6px;"><strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase() || 'N/A'}</p>
-        <p style="margin:0;"><strong>Refund Amount:</strong> <span style="color:#e67e22;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+        <p style="margin:0;"><strong>Refund Amount:</strong> <span style="color:#e67e22;font-weight:700;font-size:16px;">USD ${total.toLocaleString()}</span></p>
       </div>
 
       <div style="background:#d5f5e3;border-radius:12px;padding:20px;margin-top:16px;border-left:4px solid #27ae60;">
-        <h3 style="color:#1e8449;margin-bottom:10px;">💰 What Happens Next?</h3>
+        <h3 style="color:#1e8449;margin-bottom:10px;">ðŸ’° What Happens Next?</h3>
         <ol style="color:#1e8449;padding-left:20px;line-height:2;">
           <li>The seller has been notified of your cancellation</li>
           <li>They will contact you to confirm refund details</li>
-          <li>Your refund of <strong>UGX ${total.toLocaleString()}</strong> will be sent via <strong>${order.paymentMethod?.toUpperCase() || 'your original payment method'}</strong></li>
-          <li>Refunds typically take <strong>3–5 business days</strong></li>
+          <li>Your refund of <strong>USD ${total.toLocaleString()}</strong> will be sent via <strong>${order.paymentMethod?.toUpperCase() || 'your original payment method'}</strong></li>
+          <li>Refunds typically take <strong>3â€“5 business days</strong></li>
         </ol>
       </div>
 
-      <p style="color:#888;font-size:13px;margin-top:20px;">If you don't receive your refund within 5 business days, please contact EasyShop support.</p>
+      <p style="color:#888;font-size:13px;margin-top:20px;">If you don't receive your refund within 5 business days, please contact Global Investments support.</p>
     </div>
     <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
-      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
-      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">ðŸ›ï¸ Global Investments</p>
+      <p style="opacity:.7;font-size:13px;">Â© 2025 Global Investments. All rights reserved.</p>
     </div>
   </div></body></html>`;
 
   try {
     const info = await transporter.sendMail({
-      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      from: { name: 'Global Investments', address: process.env.SMTP_USER },
       to: email,
-      subject: `🔄 Order Cancelled ${orderId} — Refund In Progress`,
+      subject: `ðŸ”„ Order Cancelled ${orderId} â€” Refund In Progress`,
       html,
     });
     console.log('[email] Cancellation confirmation sent to user:', info.messageId);
@@ -1138,7 +1138,7 @@ const sendCancellationToUser = async (email, userName, order) => {
   }
 };
 
-// ─── REFUND COMPLETED EMAIL (to buyer) ──────────────────────────────────────
+// â”€â”€â”€ REFUND COMPLETED EMAIL (to buyer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const sendRefundCompletedToUser = async (email, userName, order, refundDetails) => {
   const orderId = `#${order._id.toString().slice(-6).toUpperCase()}`;
   const total = (order.subtotal || 0) + (order.deliveryFee || 0);
@@ -1149,7 +1149,7 @@ const sendRefundCompletedToUser = async (email, userName, order, refundDetails) 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="font-family:'Segoe UI',sans-serif;background:#f4f6f8;margin:0;padding:20px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#27ae60,#2ecc71);padding:36px 30px;text-align:center;color:#fff;">
-      <div style="font-size:48px;">✅</div>
+      <div style="font-size:48px;">âœ…</div>
       <h1 style="margin:10px 0 4px;">Refund Completed!</h1>
       <p style="opacity:.9;font-size:16px;">Your refund has been processed successfully</p>
     </div>
@@ -1159,27 +1159,27 @@ const sendRefundCompletedToUser = async (email, userName, order, refundDetails) 
 
       <div style="background:#f0faf4;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #27ae60;">
         <p style="margin:0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
-        <p style="margin:0 0 6px;"><strong>Refund Amount:</strong> <span style="color:#27ae60;font-weight:700;font-size:16px;">UGX ${total.toLocaleString()}</span></p>
+        <p style="margin:0 0 6px;"><strong>Refund Amount:</strong> <span style="color:#27ae60;font-weight:700;font-size:16px;">USD ${total.toLocaleString()}</span></p>
         <p style="margin:0 0 6px;"><strong>Refund Method:</strong> ${method}</p>
         ${reference ? `<p style="margin:0 0 6px;"><strong>Transaction Reference:</strong> ${reference}</p>` : ''}
         ${notes ? `<p style="margin:0;"><strong>Note from Seller:</strong> ${notes}</p>` : ''}
       </div>
 
       <div style="background:#e8f8f0;border-radius:10px;padding:16px;margin-top:16px;border-left:4px solid #27ae60;">
-        <p style="margin:0;color:#1e8449;font-size:14px;">💰 If you don't see the refund in your account within 24 hours, please contact EasyShop support with your order ID: <strong>${orderId}</strong></p>
+        <p style="margin:0;color:#1e8449;font-size:14px;">ðŸ’° If you don't see the refund in your account within 24 hours, please contact Global Investments support with your order ID: <strong>${orderId}</strong></p>
       </div>
     </div>
     <div style="background:#1f2937;color:#fff;padding:24px;text-align:center;">
-      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">🛍️ EasyShop</p>
-      <p style="opacity:.7;font-size:13px;">© 2024 EasyShop. All rights reserved.</p>
+      <p style="font-size:18px;font-weight:700;margin-bottom:6px;">ðŸ›ï¸ Global Investments</p>
+      <p style="opacity:.7;font-size:13px;">Â© 2025 Global Investments. All rights reserved.</p>
     </div>
   </div></body></html>`;
 
   try {
     const info = await transporter.sendMail({
-      from: { name: 'EasyShop', address: process.env.SMTP_USER },
+      from: { name: 'Global Investments', address: process.env.SMTP_USER },
       to: email,
-      subject: `✅ Refund Completed ${orderId} — UGX ${total.toLocaleString()} Sent`,
+      subject: `âœ… Refund Completed ${orderId} â€” USD ${total.toLocaleString()} Sent`,
       html,
     });
     console.log('[email] Refund completed email sent to user:', info.messageId);
@@ -1203,3 +1203,5 @@ module.exports = {
   sendCancellationToUser,
   sendRefundCompletedToUser,
 };
+
+
