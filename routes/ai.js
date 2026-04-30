@@ -108,7 +108,7 @@ CURRENT PRODUCT:
 - Brand: ${product.brand || 'N/A'}
 - Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Out of stock'}
 - Description: ${product.description || 'No description available'}
-- Seller/Shop: ${product.seller?.name || 'EasyShop Store'}
+- Seller/Shop: ${product.seller?.name || 'EasyShop'}
 - Seller Verified: ${product.seller?.verified ? 'Yes' : 'No'}
 - Cash on Delivery: ${product.cashOnDelivery || 'Available'}
 - Currency: UGX (Ugandan Shillings)
@@ -249,7 +249,7 @@ router.post('/chat', async (req, res) => {
         stock: p.stock,
         category: p.category,
         image: p.images?.[0]?.url || p.images?.[0]?.uri || null,
-        shopName: p.sellerId?.shopName || 'AllOutGadgets',
+        shopName: p.sellerId?.shopName || 'EasyShop',
         verified: p.sellerId?.verified || false,
       }));
     }
