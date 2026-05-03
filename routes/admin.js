@@ -1,15 +1,15 @@
-/**
+﻿/**
  * Admin Routes
- * POST /api/admin/login          — admin login (returns JWT)
- * GET  /api/admin/dashboard      — dashboard stats
- * GET  /api/admin/sellers        — all sellers with stats
- * GET  /api/admin/sellers/pending — pending approval sellers
- * PATCH /api/admin/sellers/:id/approve — approve a seller
- * PATCH /api/admin/sellers/:id/reject  — reject a seller
- * PATCH /api/admin/sellers/:id/suspend — suspend a seller
- * GET  /api/admin/users          — all customers
- * GET  /api/admin/orders         — all orders
- * GET  /api/admin/products       — all products
+ * POST /api/admin/login          â€” admin login (returns JWT)
+ * GET  /api/admin/dashboard      â€” dashboard stats
+ * GET  /api/admin/sellers        â€” all sellers with stats
+ * GET  /api/admin/sellers/pending â€” pending approval sellers
+ * PATCH /api/admin/sellers/:id/approve â€” approve a seller
+ * PATCH /api/admin/sellers/:id/reject  â€” reject a seller
+ * PATCH /api/admin/sellers/:id/suspend â€” suspend a seller
+ * GET  /api/admin/users          â€” all customers
+ * GET  /api/admin/orders         â€” all orders
+ * GET  /api/admin/products       â€” all products
  */
 
 const express = require('express');
@@ -23,14 +23,14 @@ const { Expo } = require('expo-server-sdk');
 
 const expo = new Expo();
 
-// ── Admin credentials (from env) ─────────────────────────────────────────────
+// â”€â”€ Admin credentials (from env) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || 'admin@eshop.ug';
 const ADMIN_NAME     = process.env.ADMIN_NAME     || 'Masereka Adorable Kimulya';
 const ADMIN_PHONE    = process.env.ADMIN_PHONE    || '+256761819885';
 const ADMIN_PASSWORD = 'Hacker X1234567'; // In production, store hashed in DB
 const ADMIN_SECRET   = process.env.ADMIN_SECRET_KEY || 'eshop-admin-secret-2025-x9k2m';
 
-// ── Admin auth middleware ────────────────────────────────────────────────────
+// â”€â”€ Admin auth middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function adminAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'No token provided' });
@@ -44,7 +44,7 @@ function adminAuth(req, res, next) {
   }
 }
 
-// ── POST /api/admin/login ────────────────────────────────────────────────────
+// â”€â”€ POST /api/admin/login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -98,11 +98,12 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ── GET /api/admin/dashboard ─────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
     const Order = require('../models/Order');
     const Product = require('../models/Product');
+    const Application = require('../models/Application');
 
     const [
       totalSellers,
@@ -112,6 +113,9 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       totalUsers,
       totalProducts,
       totalOrders,
+      totalApplications,
+      pendingApplications,
+      verifiedApplications,
       pushTokenStats,
     ] = await Promise.all([
       Seller.countDocuments({}),
@@ -121,6 +125,9 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       User.countDocuments({}),
       Product.countDocuments({}),
       Order.countDocuments({}),
+      Application.countDocuments({ isDraft: false }),
+      Application.countDocuments({ isDraft: false, verificationStatus: 'pending' }),
+      Application.countDocuments({ isDraft: false, verificationStatus: 'verified' }),
       PushToken.aggregate([
         { $group: { _id: '$userType', count: { $sum: 1 } } }
       ]),
@@ -139,6 +146,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
         users: { total: totalUsers },
         products: { total: totalProducts },
         orders: { total: totalOrders },
+        applications: { total: totalApplications, pending: pendingApplications, verified: verifiedApplications },
         pushTokens: pushStats,
       },
     });
@@ -148,7 +156,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/sellers ───────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/sellers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/sellers', adminAuth, async (req, res) => {
   try {
     const { status, approvalStatus, page = 1, limit = 20 } = req.query;
@@ -172,7 +180,7 @@ router.get('/sellers', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/sellers/pending ───────────────────────────────────────────
+// â”€â”€ GET /api/admin/sellers/pending â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/sellers/pending', adminAuth, async (req, res) => {
   try {
     const sellers = await Seller.find({ approvalStatus: 'pending_review' })
@@ -187,7 +195,7 @@ router.get('/sellers/pending', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/sellers/:id/approve ────────────────────────────────────
+// â”€â”€ PATCH /api/admin/sellers/:id/approve â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/sellers/:id/approve', adminAuth, async (req, res) => {
   try {
     const seller = await Seller.findByIdAndUpdate(
@@ -204,7 +212,7 @@ router.patch('/sellers/:id/approve', adminAuth, async (req, res) => {
       await expo.sendPushNotificationsAsync([{
         to: tokenDoc.token,
         sound: 'default',
-        title: '🎉 Account Approved!',
+        title: 'ðŸŽ‰ Account Approved!',
         body: `Congratulations ${seller.name}! Your seller account has been approved. Start selling now!`,
         data: { type: 'account_approved' },
         priority: 'high',
@@ -219,7 +227,7 @@ router.patch('/sellers/:id/approve', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/sellers/:id/reject ─────────────────────────────────────
+// â”€â”€ PATCH /api/admin/sellers/:id/reject â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/sellers/:id/reject', adminAuth, async (req, res) => {
   try {
     const { reason } = req.body;
@@ -252,7 +260,7 @@ router.patch('/sellers/:id/reject', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/sellers/:id/suspend ────────────────────────────────────
+// â”€â”€ PATCH /api/admin/sellers/:id/suspend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/sellers/:id/suspend', adminAuth, async (req, res) => {
   try {
     const { reason } = req.body;
@@ -271,7 +279,7 @@ router.patch('/sellers/:id/suspend', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/sellers/:id/unsuspend ───────────────────────────────────
+// â”€â”€ PATCH /api/admin/sellers/:id/unsuspend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/sellers/:id/unsuspend', adminAuth, async (req, res) => {
   try {
     const seller = await Seller.findByIdAndUpdate(
@@ -289,7 +297,7 @@ router.patch('/sellers/:id/unsuspend', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/users ─────────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/users', adminAuth, async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '', sort = 'newest', role } = req.query;
@@ -331,7 +339,7 @@ router.get('/users', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/users/:id — full user detail with orders ──────────────────
+// â”€â”€ GET /api/admin/users/:id â€” full user detail with orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/users/:id', adminAuth, async (req, res) => {
   try {
     const Order = require('../models/Order');
@@ -369,7 +377,7 @@ router.get('/users/:id', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/users/:id/ban ───────────────────────────────────────────
+// â”€â”€ PATCH /api/admin/users/:id/ban â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/users/:id/ban', adminAuth, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -384,7 +392,7 @@ router.patch('/users/:id/ban', adminAuth, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/users/:id/unban ─────────────────────────────────────────
+// â”€â”€ PATCH /api/admin/users/:id/unban â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/users/:id/unban', adminAuth, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
@@ -399,7 +407,7 @@ router.patch('/users/:id/unban', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/orders ────────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/orders', adminAuth, async (req, res) => {
   try {
     const Order = require('../models/Order');
@@ -420,7 +428,7 @@ router.get('/orders', adminAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/products ──────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/products', adminAuth, async (req, res) => {
   try {
     const Product = require('../models/Product');
@@ -437,6 +445,80 @@ router.get('/products', adminAuth, async (req, res) => {
   } catch (err) {
     console.error('[Admin] Get products error:', err);
     res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+// ── APPLICATION MANAGEMENT ROUTES ────────────────────────────────────────────
+const Application = require('../models/Application');
+
+// GET /api/admin/applications — list all applications with optional status filter
+router.get('/applications', adminAuth, async (req, res) => {
+  try {
+    const { status, page = 1, limit = 50 } = req.query;
+    const filter = {};
+    if (status && status !== 'all') filter.verificationStatus = status;
+    const applications = await Application.find(filter)
+      .populate('sellerId', 'name email shop')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .lean();
+    const total = await Application.countDocuments(filter);
+    res.json({ success: true, applications, total });
+  } catch (err) {
+    console.error('[Admin] Get applications error:', err);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// GET /api/admin/applications/:id — get single application detail
+router.get('/applications/:id', adminAuth, async (req, res) => {
+  try {
+    const app = await Application.findById(req.params.id)
+      .populate('sellerId', 'name email shop')
+      .lean();
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+    res.json({ success: true, application: app });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch application' });
+  }
+});
+
+// PATCH /api/admin/applications/:id/review — full admin review
+router.patch('/applications/:id/review', adminAuth, async (req, res) => {
+  try {
+    const { status, adminRating, completionScore, badges, boostLabel, reason, adminNotes, customLabel } = req.body;
+    const app = await Application.findById(req.params.id);
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+
+    if (status) app.verificationStatus = status;
+    if (adminRating !== undefined) app.adminRating = Number(adminRating);
+    if (completionScore !== undefined) app.completionScore = Number(completionScore);
+    if (badges) app.badges = badges;
+    if (boostLabel) app.boostLabel = boostLabel;
+    if (reason !== undefined) app.verificationNotes = reason;
+    if (adminNotes !== undefined) app.adminNotes = adminNotes;
+    if (customLabel !== undefined) app.customLabel = customLabel;
+    app.reviewedAt = new Date();
+    app.reviewedBy = req.adminId;
+
+    await app.save();
+    res.json({ success: true, message: `Application ${status || 'updated'} successfully`, application: app });
+  } catch (err) {
+    console.error('[Admin] Review application error:', err);
+    res.status(500).json({ error: 'Failed to review application' });
+  }
+});
+
+// PATCH /api/admin/applications/:id/boost — quick boost/unboost
+router.patch('/applications/:id/boost', adminAuth, async (req, res) => {
+  try {
+    const { boostLabel } = req.body;
+    const app = await Application.findByIdAndUpdate(req.params.id, { boostLabel }, { new: true });
+    if (!app) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, application: app });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update boost' });
   }
 });
 

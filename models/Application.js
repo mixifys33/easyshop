@@ -201,6 +201,48 @@ const applicationSchema = new mongoose.Schema({
     type: Date
   },
 
+  // Admin Review Fields
+  adminRating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: null
+  },
+  completionScore: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null
+  },
+  badges: [{
+    type: String,
+    enum: [
+      'Featured', 'Top Rated', 'Best Seller', 'New Arrival', 'Staff Pick',
+      'Premium Quality', 'Well Documented', 'Actively Maintained',
+      'Beginner Friendly', 'Enterprise Ready', 'Open Source', 'Award Winner'
+    ]
+  }],
+  boostLabel: {
+    type: String,
+    enum: ['none', 'boosted', 'unboosted', 'trending', 'hot', 'editors_choice'],
+    default: 'none'
+  },
+  customLabel: {
+    type: String,
+    trim: true,
+    maxlength: 50
+  },
+  adminNotes: {
+    type: String,
+    trim: true
+  },
+  reviewedAt: {
+    type: Date
+  },
+  reviewedBy: {
+    type: String
+  },
+
   // Analytics
   views: {
     type: Number,
