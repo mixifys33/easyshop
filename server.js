@@ -257,9 +257,6 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/shops', sellerRoutes);
 
 // Alias routes — map old monorepo-style endpoints to the standalone backend auth routes
-const jwt = require('jsonwebtoken');
-const User = require('./models/User');
-
 app.post('/api/user-registration', (req, res, next) => {
   req.url = '/register';
   authRoutes(req, res, next);
