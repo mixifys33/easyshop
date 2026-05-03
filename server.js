@@ -30,6 +30,7 @@ const userAddressRoutes = require('./routes/userAddresses');
 const pushTokenRoutes = require('./routes/pushTokens');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
+const applicationRoutes = require('./routes/applications');
 
 const app = express();
 const server = http.createServer(app);
@@ -250,6 +251,7 @@ app.use('/api/user/addresses', userAddressRoutes);
 app.use('/api/push-tokens', pushTokenRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);
