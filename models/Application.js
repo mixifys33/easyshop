@@ -52,12 +52,10 @@ const applicationSchema = new mongoose.Schema({
   // URLs & Links
   liveDemo: {
     type: String,
-    required: true,
     trim: true
   },
   githubRepo: {
     type: String,
-    required: true,
     trim: true
   },
   documentationUrl: {
@@ -97,20 +95,7 @@ const applicationSchema = new mongoose.Schema({
   // Technical Details
   supportedPlatforms: [{
     type: String,
-    enum: [
-      'Web Browser',
-      'iOS',
-      'Android',
-      'Windows',
-      'macOS',
-      'Linux',
-      'Chrome Extension',
-      'Firefox Extension',
-      'Safari Extension',
-      'Node.js Server',
-      'Docker Container',
-      'Cloud Platform'
-    ]
+    trim: true
   }],
   technicalRequirements: [{
     name: String,
