@@ -267,6 +267,43 @@ const applicationSchema = new mongoose.Schema({
     default: false
   },
 
+  // Distribution & Delivery Settings
+  distribution: {
+    instant_download: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    email_delivery: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    github_access: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    whatsapp: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    google_drive: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    custom: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, trim: true },
+      note: { type: String, trim: true }
+    },
+    emailNotification: { type: Boolean, default: true },
+    processingTime: { type: String, default: 'Within 5 mins' },
+    globalNote: { type: String, trim: true }
+  },
+
   // SEO
   slug: {
     type: String,

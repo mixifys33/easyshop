@@ -590,6 +590,89 @@ router.post('/:id/download', async (req, res) => {
   }
 });
 
+// GET /api/applications/:id/distribution - Get distribution settings for an application
+router.get('/:id/distribution', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID'
+      });
+    }
+    
+    const application = await Application.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      distribution: application.distribution || {}
+    });
+  } catch (error) {
+    console.error('Error fetching distribution settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch distribution settings',
+      error: error.message
+    });
+  }
+});
+
+// PUT /api/applications/:id/distribution - Update distribution settings for an application
+router.put('/:id/distribution', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { distribution } = req.body;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid application ID'
+      });
+    }
+    
+    if (!distribution) {
+      return res.status(400).json({
+        success: false,
+        message: 'Distribution settings are required'
+      });
+    }
+    
+    const application = await Application.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+    
+    // Update distribution settings
+    application.distribution = distribution;
+    application.updatedAt = new Date();
+    
+    await application.save();
+    
+    res.json({
+      success: true,
+      message: 'Distribution settings updated successfully',
+      distribution: application.distribution
+    });
+  } catch (error) {
+    console.error('Error updating distribution settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update distribution settings',
+      error: error.message
+    });
+  }
+});
+
 // ── BULK UPLOAD ROUTES ────────────────────────────────────────────────────────
 
 const multer = require('multer');
