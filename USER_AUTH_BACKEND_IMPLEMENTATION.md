@@ -18,7 +18,7 @@ The frontend expected 6-digit verification codes for users, but the backend was 
 
 - **`sendUserOTPEmail()`** - User-focused verification and password reset emails
 - **`sendUserWelcomeEmail()`** - Welcome email after successful account verification
-- **EasyShop branding** - Shopping bag emoji, user-friendly language
+- **vettcode branding** - Shopping bag emoji, user-friendly language
 - **Modern design** - Gradient backgrounds, professional styling
 
 ### 2. **Updated User Auth Routes** (`backend/routes/auth.js`)
@@ -56,7 +56,7 @@ const generateUserOTP = () => {
 
 ### User Email Templates
 
-- **EasyShop Branding** - Shopping bag emoji (🛍️) and user-friendly messaging
+- **vettcode Branding** - Shopping bag emoji (🛍️) and user-friendly messaging
 - **Modern Design** - Gradient backgrounds, professional typography
 - **User-Focused Content** - Shopping benefits, welcome messages, security notices
 - **Responsive Design** - Mobile-friendly email layouts
@@ -79,7 +79,7 @@ const generateUserOTP = () => {
 
 ### After (User-Focused)
 
-- EasyShop branding
+- vettcode branding
 - Shopping/customer language
 - Consumer benefits messaging
 - 6-digit codes
@@ -108,7 +108,7 @@ const generateUserOTP = () => {
 
 1. **Frontend sends** registration data
 2. **Backend generates** 6-digit OTP
-3. **User receives** EasyShop-branded email with 6-digit code
+3. **User receives** vettcode-branded email with 6-digit code
 4. **Frontend expects** 6-digit input (6 input fields)
 5. **Backend verifies** 6-digit code
 6. **Perfect match** - no more misalignment!
@@ -126,7 +126,7 @@ const generateUserOTP = () => {
 
 ### User Verification Email
 
-- **Header**: EasyShop logo with shopping bag emoji
+- **Header**: vettcode logo with shopping bag emoji
 - **Welcome Message**: "Welcome to Your Shopping Journey!"
 - **6-Digit Code**: Large, prominent display with letter spacing
 - **Benefits Section**: Shopping features and benefits
@@ -157,14 +157,14 @@ const generateUserOTP = () => {
 
 ### User Experience Benefits
 
-- **Consistent Branding** - EasyShop theme throughout
+- **Consistent Branding** - vettcode theme throughout
 - **Clear Messaging** - User-focused language and benefits
 - **Professional Appearance** - Modern, trustworthy email design
 - **Smooth Flow** - No confusion between user and seller processes
 
 ### Business Benefits
 
-- **Brand Consistency** - Proper EasyShop branding for users
+- **Brand Consistency** - Proper vettcode branding for users
 - **User Trust** - Professional, secure authentication process
 - **Reduced Support** - Clear, user-friendly error messages
 - **Better Conversion** - Smooth onboarding experience

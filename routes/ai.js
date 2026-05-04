@@ -78,7 +78,7 @@ const formatRelatedProducts = (products) => {
     const price = p.salePrice
       ? `UGX ${Number(p.salePrice).toLocaleString()}`
       : `UGX ${Number(p.regularPrice).toLocaleString()}`;
-    const shop = p.sellerId?.shopName || 'EasyShop';
+    const shop = p.sellerId?.shopName || 'vettcode';
     const verified = p.sellerId?.verified ? ' (Verified)' : '';
     const desc = p.description ? p.description.slice(0, 100) : '';
     return `${i + 1}. ${p.title} — ${price} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock > 0 ? p.stock + ' units' : 'Out of stock'} | Shop: ${shop}${verified}\n   ${desc}`;
@@ -97,7 +97,7 @@ const buildSystemPrompt = (product, relatedProducts = []) => {
     ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options — use ONLY the products listed above. Never invent or mention products not listed here.\n`
     : '';
 
-  return `You are a helpful AI shopping assistant for EasyShop called ADO-( Advanced Developtilasied Optimatic AI after your creator Masereka Adorable Kimulya), an e-commerce store in Uganda. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
+  return `You are a helpful AI shopping assistant for vettcode called ADO-( Advanced Developtilasied Optimatic AI after your creator Masereka Adorable Kimulya), an e-commerce store in Uganda. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
 Do not recommend other stores or platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
 
 CURRENT PRODUCT:
@@ -108,7 +108,7 @@ CURRENT PRODUCT:
 - Brand: ${product.brand || 'N/A'}
 - Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Out of stock'}
 - Description: ${product.description || 'No description available'}
-- Seller/Shop: ${product.seller?.name || 'EasyShop'}
+- Seller/Shop: ${product.seller?.name || 'vettcode'}
 - Seller Verified: ${product.seller?.verified ? 'Yes' : 'No'}
 - Cash on Delivery: ${product.cashOnDelivery || 'Available'}
 - Currency: UGX (Ugandan Shillings)
@@ -174,8 +174,8 @@ router.post('/chat', async (req, res) => {
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://easyshop.com',
-            'X-Title': 'EasyShop AI Assistant',
+            'HTTP-Referer': 'https://vettcode.com',
+            'X-Title': 'vettcode AI Assistant',
           },
           body: JSON.stringify({
             model,
@@ -249,7 +249,7 @@ router.post('/chat', async (req, res) => {
         stock: p.stock,
         category: p.category,
         image: p.images?.[0]?.url || p.images?.[0]?.uri || null,
-        shopName: p.sellerId?.shopName || 'EasyShop',
+        shopName: p.sellerId?.shopName || 'vettcode',
         verified: p.sellerId?.verified || false,
       }));
     }

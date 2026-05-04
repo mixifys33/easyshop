@@ -1,6 +1,6 @@
 # Backend Scripts
 
-This directory contains utility scripts for managing the EasyShop backend.
+This directory contains utility scripts for managing the vettcode backend.
 
 ## Available Scripts
 

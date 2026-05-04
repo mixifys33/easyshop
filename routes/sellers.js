@@ -1869,4 +1869,37 @@ router.get(['/detail/:sellerId/products', '/:sellerId/products'], async (req, re
   }
 });
 
+// ── GET /api/sellers/distribution/:sellerId — get distribution settings ──────
+router.get('/distribution/:sellerId', async (req, res) => {
+  try {
+    const seller = await Seller.findById(req.params.sellerId).select('distribution').lean();
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+    res.json({ success: true, distribution: seller.distribution || null });
+  } catch (err) {
+    console.error('GET distribution error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── PUT /api/sellers/distribution/:sellerId — save distribution settings ─────
+router.put('/distribution/:sellerId', async (req, res) => {
+  try {
+    const { distribution } = req.body;
+    if (!distribution) return res.status(400).json({ success: false, message: 'Distribution settings required' });
+
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.sellerId,
+      { $set: { distribution } },
+      { new: true }
+    ).select('distribution');
+
+    if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
+
+    res.json({ success: true, distribution: seller.distribution });
+  } catch (err) {
+    console.error('PUT distribution error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

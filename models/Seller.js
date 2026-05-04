@@ -177,27 +177,6 @@ const sellerSchema = new mongoose.Schema({
     preferredMethod: { type: String, enum: ['mtn', 'airtel', 'bank', 'all', ''], default: '' },
   },
 
-  // Delivery settings
-  delivery: {
-    offersDelivery: { type: Boolean, default: false },
-    offersPickup: { type: Boolean, default: false },
-    freeDeliveryThreshold: { type: Number, default: 0 }, // min order for free delivery (UGX)
-    processingDays: { type: Number, default: 1 },
-    // Terminals/locations this seller ships from or drops off at
-    terminals: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'DeliveryTerminal'
-    }],
-    // Custom delivery zones with fees
-    zones: [{
-      name: { type: String },
-      fee: { type: Number, default: 0 },
-      estimatedDays: { type: String },
-      active: { type: Boolean, default: true }
-    }],
-    notes: { type: String, trim: true }
-  },
-
   // Seller metrics
   metrics: {
     totalProducts: {
@@ -248,6 +227,11 @@ sellerSchema.methods.generateResetPasswordToken = function() {
   this.resetPasswordToken = token;
   this.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
   return token;
+  // Digital distribution settings
+  distribution: {
+    type: Object,
+    default: null,
+  },
 };
 
 module.exports = mongoose.model('Seller', sellerSchema);

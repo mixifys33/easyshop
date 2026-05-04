@@ -1,7 +1,7 @@
 {
-  "name": "easyshop-backend",
+  "name": "vettcode-backend",
   "version": "1.0.0",
-  "description": "Backend API for EasyShop Uganda e-commerce application",
+  "description": "Backend API for vettcode Uganda e-commerce application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

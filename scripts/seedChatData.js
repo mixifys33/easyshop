@@ -88,7 +88,7 @@ const seedChatData = async () => {
           avatar: null
         },
         content: {
-          text: 'Welcome to EasyShop public chat! 🎉',
+          text: 'Welcome to vettcode public chat! 🎉',
           type: 'text'
         },
         status: 'sent'
