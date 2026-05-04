@@ -123,10 +123,15 @@ const applicationSchema = new mongoose.Schema({
       'Custom License'
     ]
   },
+  isFree: {
+    type: Boolean,
+    default: false
+  },
   price: {
     type: Number,
     required: true,
-    min: 0
+    min: 0,
+    default: 0
   },
   currency: {
     type: String,

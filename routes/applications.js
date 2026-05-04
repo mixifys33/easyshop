@@ -30,7 +30,13 @@ const validateApplicationData = (data, isDraft = false) => {
     if (!data.liveDemo?.trim()) errors.push('Live demo URL is required');
     if (!data.githubRepo?.trim()) errors.push('GitHub repository URL is required');
     if (!data.licenseType) errors.push('License type is required');
-    if (data.price === undefined || data.price === null) errors.push('Price is required');
+    // Price validation: if not free, price must be provided and > 0
+    if (!data.isFree && (data.price === undefined || data.price === null)) {
+      errors.push('Price is required (or mark as free)');
+    }
+    if (data.isFree) {
+      data.price = 0; // Ensure free apps have price set to 0
+    }
     if (!data.sellerId) errors.push('Seller ID is required');
     
     // URL validation
