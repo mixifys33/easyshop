@@ -227,11 +227,6 @@ sellerSchema.methods.generateResetPasswordToken = function() {
   this.resetPasswordToken = token;
   this.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
   return token;
-  // Digital distribution settings
-  distribution: {
-    type: Object,
-    default: null,
-  },
 };
 
 module.exports = mongoose.model('Seller', sellerSchema);
