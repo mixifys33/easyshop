@@ -1,7 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const router = express.Router();
-const Product = require('../models/Product');
+const Application = require('../models/Application');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -32,9 +32,9 @@ function prepareMessages(messages, model) {
 
 // Keywords that signal the user wants comparisons / alternatives
 const COMPARISON_KEYWORDS = [
-  'cheaper', 'less expensive', 'affordable', 'budget',
+  'cheaper', 'less expensive', 'affordable', 'budget', 'free',
   'better', 'best', 'alternative', 'similar', 'compare', 'comparison',
-  'other products', 'other options', 'something else', 'recommend',
+  'other applications', 'other apps', 'other options', 'something else', 'recommend',
   'suggestion', 'suggest', 'instead', 'upgrade', 'downgrade',
   'vs', 'versus', 'difference between', 'which is better', 'show me more',
 ];
@@ -46,83 +46,120 @@ const needsComparison = (messages) => {
   return COMPARISON_KEYWORDS.some(kw => text.includes(kw));
 };
 
-// Fetch up to 6 related products from the same category (excluding current)
-const getRelatedProducts = async (product) => {
+// Fetch up to 6 related applications from the same category (excluding current)
+const getRelatedApplications = async (application) => {
   try {
     const query = {
-      status: 'active',
+      verificationStatus: 'verified',
+      isActive: true,
       isDraft: { $ne: true },
     };
-    if (product._id || product.id) {
-      query._id = { $ne: product._id || product.id };
+    if (application._id || application.id) {
+      query._id = { $ne: application._id || application.id };
     }
-    if (product.category) query.category = product.category;
+    if (application.appCategory) query.appCategory = application.appCategory;
 
-    const related = await Product.find(query)
-      .select('title regularPrice salePrice category subCategory brand stock description cashOnDelivery images')
+    const related = await Application.find(query)
+      .select('appName price isFree currency appCategory subCategory technologyStack supportedPlatforms rating downloads verificationStatus shortDescription screenshots badges')
       .populate('sellerId', 'shopName verified')
-      .sort({ salePrice: 1 })
+      .sort({ downloads: -1, rating: -1 })
       .limit(6)
       .lean();
 
     return related;
   } catch (err) {
-    console.error('Warning: Failed to fetch related products:', err.message);
+    console.error('Warning: Failed to fetch related applications:', err.message);
     return [];
   }
 };
 
-const formatRelatedProducts = (products) => {
-  if (!products.length) return '';
-  return products.map((p, i) => {
-    const price = p.salePrice
-      ? `UGX ${Number(p.salePrice).toLocaleString()}`
-      : `UGX ${Number(p.regularPrice).toLocaleString()}`;
-    const shop = p.sellerId?.shopName || 'vettcode';
-    const verified = p.sellerId?.verified ? ' (Verified)' : '';
-    const desc = p.description ? p.description.slice(0, 100) : '';
-    return `${i + 1}. ${p.title} — ${price} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock > 0 ? p.stock + ' units' : 'Out of stock'} | Shop: ${shop}${verified}\n   ${desc}`;
+const formatRelatedApplications = (applications) => {
+  if (!applications.length) return '';
+  return applications.map((app, i) => {
+    const price = app.isFree || app.price === 0
+      ? 'FREE'
+      : `${app.currency || 'USD'} ${Number(app.price).toLocaleString()}`;
+    const shop = app.sellerId?.shopName || 'VETTCODE';
+    const verified = app.sellerId?.verified ? ' (Verified Seller)' : '';
+    const rating = app.rating ? `⭐ ${app.rating}/5` : 'No ratings yet';
+    const downloads = app.downloads ? `${app.downloads.toLocaleString()} downloads` : 'New';
+    const tech = app.technologyStack?.slice(0, 3).join(', ') || 'N/A';
+    const platforms = app.supportedPlatforms?.join(', ') || 'N/A';
+    const desc = app.shortDescription ? app.shortDescription.slice(0, 100) : '';
+    const status = app.verificationStatus === 'verified' ? '✅ Verified' : '⏳ Pending';
+    return `${i + 1}. ${app.appName} — ${price} | ${rating} | ${downloads} | ${status}\n   Tech: ${tech} | Platforms: ${platforms} | Seller: ${shop}${verified}\n   ${desc}`;
   }).join('\n\n');
 };
 
-// Build the system prompt with full product context
-const buildSystemPrompt = (product, relatedProducts = []) => {
-  const price = product.price ? `UGX ${Number(product.price).toLocaleString()}` : 'N/A';
-  const originalPrice = product.originalPrice ? `UGX ${Number(product.originalPrice).toLocaleString()}` : null;
-  const discount = originalPrice
-    ? `${Math.round((1 - product.price / product.originalPrice) * 100)}% off from ${originalPrice}`
-    : null;
+// Build the system prompt with full application context
+const buildSystemPrompt = (application, relatedApplications = []) => {
+  const price = application.isFree || application.price === 0
+    ? 'FREE'
+    : application.price
+    ? `${application.currency || 'USD'} ${Number(application.price).toLocaleString()}`
+    : 'Contact seller';
 
-  const relatedSection = relatedProducts.length > 0
-    ? `\nOTHER AVAILABLE PRODUCTS IN THE SAME CATEGORY (real data from our store):\n${formatRelatedProducts(relatedProducts)}\n\nWhen the customer asks for comparisons, alternatives, cheaper or better options — use ONLY the products listed above. Never invent or mention products not listed here.\n`
+  const tech = application.technologyStack?.join(', ') || 'Not specified';
+  const platforms = application.supportedPlatforms?.join(', ') || 'Not specified';
+  const techRequirements = application.technicalRequirements?.map(r => `- ${r.name}: ${r.value}`).join('\n') || 'Not specified';
+  const dependencies = application.dependencies?.map(d => `- ${d.name} ${d.version ? `(${d.version})` : ''}: ${d.description || ''}`).join('\n') || 'Not specified';
+  const badges = application.badges?.join(', ') || 'None';
+
+  const relatedSection = relatedApplications.length > 0
+    ? `\nOTHER AVAILABLE APPLICATIONS IN THE SAME CATEGORY (real data from VETTCODE):\n${formatRelatedApplications(relatedApplications)}\n\nWhen the user asks for comparisons, alternatives, cheaper or better options — use ONLY the applications listed above. Never invent or mention applications not listed here.\n`
     : '';
 
-  return `You are a helpful AI shopping assistant for vettcode called ADO-( Advanced Developtilasied Optimatic AI after your creator Masereka Adorable Kimulya), an e-commerce store in Uganda. You NEVER answer in table format, When data needs to be structured, organized, or compared, DO NOT use rows and columns but Instead, use a nested bulleted list, bold text for headers, and paragraphs and Ensure all information is presented as clean text or markdown bullet points only.
-Do not recommend other stores or platforms. If the user needs something not shown, direct them to use the search bar on the home screen.
+  return `You are VettCode AI, a helpful AI assistant for VETTCODE, a global marketplace for verified, production-ready applications and codebases. You NEVER answer in table format. When data needs to be structured, organized, or compared, DO NOT use rows and columns. Instead, use nested bulleted lists, bold text for headers, and paragraphs. Ensure all information is presented as clean text or markdown bullet points only.
 
-CURRENT PRODUCT:
-- Name: ${product.name || product.title || 'Unknown'}
-- Price: ${price}${discount ? ` (${discount})` : ''}
-- Category: ${product.category || 'N/A'}
-- Sub-category: ${product.subCategory || 'N/A'}
-- Brand: ${product.brand || 'N/A'}
-- Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Out of stock'}
-- Description: ${product.description || 'No description available'}
-- Seller/Shop: ${product.seller?.name || 'vettcode'}
-- Seller Verified: ${product.seller?.verified ? 'Yes' : 'No'}
-- Cash on Delivery: ${product.cashOnDelivery || 'Available'}
-- Currency: UGX (Ugandan Shillings)
+Do not recommend other platforms or marketplaces. If the user needs something not shown, direct them to use the search bar on VETTCODE.
+
+CURRENT APPLICATION:
+- Name: ${application.appName || application.name || application.title || 'Unknown'}
+- Price: ${price}
+- Category: ${application.appCategory || 'N/A'}
+- Sub-category: ${application.subCategory || 'N/A'}
+- Technology Stack: ${tech}
+- Supported Platforms: ${platforms}
+- License Type: ${application.licenseType || 'Not specified'}
+- Commercial Use: ${application.commercialUse || 'Not specified'}
+- Resale Rights: ${application.resaleRights || 'Not specified'}
+- Rating: ${application.rating ? `⭐ ${application.rating}/5` : 'No ratings yet'}
+- Downloads: ${application.downloads ? `${application.downloads.toLocaleString()} downloads` : 'New application'}
+- Views: ${application.views ? `${application.views.toLocaleString()} views` : '0 views'}
+- Verification Status: ${application.verificationStatus === 'verified' ? '✅ Production-Ready & Verified' : '⏳ Under Review'}
+- Badges: ${badges}
+- Short Description: ${application.shortDescription || 'No description'}
+- Detailed Description: ${application.detailedDescription || 'No detailed description available'}
+- Seller/Developer: ${application.seller?.name || 'VETTCODE'}
+- Seller Verified: ${application.seller?.verified ? 'Yes ✅' : 'No'}
+- Support Level: ${application.supportLevel || 'Community'}
+- Update Frequency: ${application.updateFrequency || 'Active'}
+- Installation Support: ${application.installationSupport || 'Yes'}
+- Warranty: ${application.warranty || '30 days'}
+- Live Demo: ${application.liveDemo || 'Not available'}
+- GitHub Repo: ${application.githubRepo || 'Not available'}
+- Documentation: ${application.documentationUrl || 'Not available'}
+- Video Demo: ${application.videoDemo || 'Not available'}
+
+TECHNICAL REQUIREMENTS:
+${techRequirements}
+
+DEPENDENCIES:
+${dependencies}
 ${relatedSection}
 YOUR ROLE:
-- Answer questions about this product honestly and helpfully
-- Help the customer decide if this product suits their needs
-- Explain technical specs in simple, clear language
-- Compare with real alternatives from the store when asked
+- Answer questions about this application honestly and helpfully
+- Help developers decide if this application suits their project needs
+- Explain technical specifications, tech stack, and implementation details clearly
+- Compare with real alternatives from VETTCODE when asked
+- Discuss security, scalability, and production-readiness
+- Provide insights on licensing, commercial use, and resale rights
 - Be concise — short and direct unless detail is needed
-- Never make up specs, prices, or products not listed above
-- Always be friendly and supportive
+- Never make up specs, prices, features, or applications not listed above
+- Always be professional, friendly, and supportive
+- Focus on code quality, developer experience, and business value
 
-The customer does NOT need to re-explain what product they are viewing.`;
+The user is viewing this application and does NOT need to re-explain what they're looking at.`;
 };
 
 // POST /api/ai/chat
@@ -135,22 +172,22 @@ router.post('/chat', async (req, res) => {
     }
 
     if (!product) {
-      return res.status(400).json({ success: false, message: 'Product context is required' });
+      return res.status(400).json({ success: false, message: 'Application context is required' });
     }
 
     if (!OPENROUTER_API_KEY) {
       return res.status(500).json({ success: false, message: 'AI service not configured' });
     }
 
-    // Fetch related products if the user is asking for comparisons/alternatives
-    let relatedProducts = [];
+    // Fetch related applications if the user is asking for comparisons/alternatives
+    let relatedApplications = [];
     if (needsComparison(messages)) {
-      console.log('🔍 Comparison query detected — fetching related products from DB...');
-      relatedProducts = await getRelatedProducts(product);
-      console.log(`� Found ${relatedProducts.length} related products`);
+      console.log('🔍 Comparison query detected — fetching related applications from DB...');
+      relatedApplications = await getRelatedApplications(product);
+      console.log(`✅ Found ${relatedApplications.length} related applications`);
     }
 
-    const systemPrompt = buildSystemPrompt(product, relatedProducts);
+    const systemPrompt = buildSystemPrompt(product, relatedApplications);
 
     const chatMessages = [
       { role: 'system', content: systemPrompt },
@@ -160,7 +197,7 @@ router.post('/chat', async (req, res) => {
       })),
     ];
 
-    console.log(`🤖 AI Chat — product: ${product.name || product.title} | messages: ${messages.length}`);
+    console.log(`🤖 VettCode AI Chat — application: ${product.appName || product.name || product.title} | messages: ${messages.length}`);
 
     let data = null;
     let lastError = null;
@@ -237,20 +274,25 @@ router.post('/chat', async (req, res) => {
 
     console.log(`✅ AI replied (${aiReply.length} chars)`);
 
-    // Include related products in response so frontend can render comparison cards
+    // Include related applications in response so frontend can render comparison cards
     const responsePayload = { success: true, reply: aiReply.trim() };
-    if (relatedProducts.length > 0) {
-      responsePayload.relatedProducts = relatedProducts.map(p => ({
-        _id: p._id,
-        title: p.title,
-        salePrice: p.salePrice,
-        regularPrice: p.regularPrice,
-        brand: p.brand,
-        stock: p.stock,
-        category: p.category,
-        image: p.images?.[0]?.url || p.images?.[0]?.uri || null,
-        shopName: p.sellerId?.shopName || 'vettcode',
-        verified: p.sellerId?.verified || false,
+    if (relatedApplications.length > 0) {
+      responsePayload.relatedProducts = relatedApplications.map(app => ({
+        _id: app._id,
+        title: app.appName,
+        appName: app.appName,
+        price: app.price,
+        isFree: app.isFree,
+        currency: app.currency,
+        rating: app.rating,
+        downloads: app.downloads,
+        appCategory: app.appCategory,
+        technologyStack: app.technologyStack,
+        verificationStatus: app.verificationStatus,
+        badges: app.badges,
+        image: app.screenshots?.[0]?.url || app.screenshots?.[0]?.thumbnailUrl || null,
+        shopName: app.sellerId?.shopName || 'VETTCODE',
+        verified: app.sellerId?.verified || false,
       }));
     }
     res.json(responsePayload);
