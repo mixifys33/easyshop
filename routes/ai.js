@@ -217,7 +217,7 @@ router.post('/chat', async (req, res) => {
           body: JSON.stringify({
             model,
             messages: prepareMessages(chatMessages, model),
-            max_tokens: 900,
+            max_tokens: 4000,
             temperature: 0.9,
           }),
         });

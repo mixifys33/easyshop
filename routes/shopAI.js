@@ -67,7 +67,7 @@ const SELLER_PUBLIC_SELECT = 'shop.shopName shop.shopDescription shop.businessTy
 
 // â”€â”€ Call AI with model fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(messages, models, maxTokens) {
-  maxTokens = maxTokens || 600;
+  maxTokens = maxTokens || 3000;
   var lastError = null;
   for (var i = 0; i < models.length; i++) {
     try {
@@ -533,7 +533,7 @@ router.post('/chat', async function(req, res) {
     console.log('[shopAI] userId:', userId, '| msgs:', cleanHistory.length,
       '| products:', dbContext.productCards.length, '| orders:', dbContext.orderCards.length);
 
-    var reply = await callAI(aiMessages, MODELS, 500);
+    var reply = await callAI(aiMessages, MODELS, 3000);
 
     res.json({
       success: true,
