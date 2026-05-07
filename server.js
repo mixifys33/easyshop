@@ -21,6 +21,7 @@ const aiRoutes = require('./routes/ai');
 const orderRoutes = require('./routes/orders');
 const paymentVerifyRoutes = require('./routes/paymentVerify');
 const shopAIRoutes = require('./routes/shopAI');
+const vettcodeAIRoutes = require('./routes/vettcodeAI');
 const campaignRoutes = require('./routes/campaigns');
 const cartRoutes = require('./routes/cart');
 const wishlistRoutes = require('./routes/wishlist');
@@ -240,7 +241,8 @@ app.use('/api/imagekit', imagekitRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment-verify', paymentVerifyRoutes);
-app.use('/api/shop-ai', shopAIRoutes);
+app.use('/api/shop-ai', shopAIRoutes); // Legacy route
+app.use('/api/vettcode-ai', vettcodeAIRoutes); // New VettCode AI route
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
