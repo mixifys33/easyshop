@@ -296,10 +296,13 @@ function detectTopics(messages) {
     if (messages[i].role === 'user') { lastUser = (messages[i].content || '').toLowerCase(); break; }
   }
   return {
-    wantsOrders:       /\b(order|orders|my order|track|tracking|status|purchase|bought|placed)\b/.test(allText),
-    wantsApplications: /\b(app|application|applications|find|search|show|looking for|buy|price|cost|available|download|code|source|github|demo|recommend|similar|compare|alternative|sell|selling|have you got|do you have|web app|mobile app|saas|api|dashboard|template|plugin|library|tool)\b/.test(allText),
+    wantsOrders:       /\b(order|orders|my order|my purchase|purchase history|track|tracking|status|bought|placed|download history|my downloads|what did i buy|what have i purchased)\b/.test(allText),
+    wantsApplications: /\b(app|application|applications|find|search|show|looking for|buy|price|cost|available|download|code|source|github|demo|recommend|similar|compare|alternative|sell|selling|have you got|do you have|web app|mobile app|saas|api|dashboard|template|plugin|library|tool|trending|popular|best)\b/.test(allText),
     wantsCategories:   /\b(categor|categories|types|kinds|what do you sell|what apps|browse|section)\b/.test(allText),
     wantsSeller:       /\b(seller|developer|shop|store|vendor|who sells|who made|verified|creator)\b/.test(allText),
+    wantsCompare:      /\b(compare|comparison|versus|vs|difference|which is better|side by side)\b/.test(allText),
+    wantsTrending:     /\b(trending|popular|hot|top rated|most downloaded|best selling|what's hot|what's popular)\b/.test(allText),
+    wantsSupport:      /\b(help|support|issue|problem|can't|cannot|not working|error|assistance|guide|how to|how do i)\b/.test(allText),
     specificOrderId: extractOrderId(lastUser),
     lastUserText: lastUser,
     allText: allText,
@@ -343,23 +346,45 @@ async function buildSystemContext(messages, userId) {
   var applicationCards = [];
   var orderCards = [];
 
+  // Add user context at the beginning
+  if (userId) {
+    contextParts.push('USER IS LOGGED IN: User ID = ' + userId);
+    contextParts.push('You have access to this user\'s purchase history, orders, and downloads. Use this information to provide personalized help.');
+  } else {
+    contextParts.push('USER IS NOT LOGGED IN: User is browsing anonymously.');
+    contextParts.push('If they ask about purchases, orders, or downloads, politely ask them to log in first.');
+  }
+
   var categories = await fetchCategories().catch(function() { return []; });
-  contextParts.push('AVAILABLE CATEGORIES: ' + (categories.length
+  contextParts.push('\nAVAILABLE CATEGORIES: ' + (categories.length
     ? categories.join(', ')
     : 'Web Application, Mobile App, Desktop Application, API/Backend Service, Dashboard, E-commerce Solution'));
 
-  if (topics.wantsApplications || topics.wantsSeller) {
+  if (topics.wantsApplications || topics.wantsSeller || topics.wantsTrending || topics.wantsCompare) {
     var priceFilter = parsePriceFilter(topics.lastUserText);
     var query = extractSearchQuery(topics.lastUserText);
-    var rawApps = await fetchApplications(query, 8, priceFilter).catch(function() { return []; });
+    
+    // For trending queries, fetch more apps sorted by downloads
+    var limit = topics.wantsTrending ? 12 : (topics.wantsCompare ? 8 : 6);
+    var rawApps = await fetchApplications(query, limit, priceFilter).catch(function() { return []; });
 
     if (!rawApps.length && query) {
-      rawApps = await fetchApplications('', 6, priceFilter).catch(function() { return []; });
+      rawApps = await fetchApplications('', limit, priceFilter).catch(function() { return []; });
     }
 
     if (rawApps.length) {
-      contextParts.push('\nMATCHING APPLICATIONS FROM VETTCODE DATABASE:\n' + rawApps.map(formatApplicationForAI).join('\n'));
+      var contextLabel = topics.wantsTrending 
+        ? '\nTRENDING APPLICATIONS (sorted by downloads and popularity):\n'
+        : topics.wantsCompare
+        ? '\nAPPLICATIONS FOR COMPARISON:\n'
+        : '\nMATCHING APPLICATIONS FROM VETTCODE DATABASE:\n';
+      
+      contextParts.push(contextLabel + rawApps.map(formatApplicationForAI).join('\n'));
       applicationCards = rawApps.map(formatApplicationCard);
+      
+      if (topics.wantsCompare && rawApps.length >= 2) {
+        contextParts.push('\nCOMPARISON INSTRUCTIONS: Show these applications side-by-side, highlighting key differences in price, tech stack, features, ratings, and downloads.');
+      }
     } else {
       contextParts.push('\nAPPLICATIONS: No applications found matching this query in the database.');
     }
@@ -398,13 +423,20 @@ CRITICAL RULES – NEVER BREAK THESE:
 1. ONLY use data from the DATABASE section below. If something is not listed there, it does not exist.
 2. NEVER mention any external marketplace (no GitHub Marketplace, CodeCanyon, etc.) in a negative way – focus on VettCode's strengths.
 3. NEVER invent application data, prices, features, or order details. Only use what is in the data.
-4. If user asks about orders and is not logged in, tell them to log in first.
+4. CHECK USER LOGIN STATUS in the database context. If user is logged in, you can access their orders and provide personalized help. If not logged in, politely ask them to log in for personalized features.
 5. Prices are in USD unless otherwise specified.
 6. Never mention passwords, payment credentials, tokens, or any sensitive data.
 7. Handle ALL topics naturally in one conversation – applications, orders, downloads, tech stacks, categories.
 8. When showing applications, mention key facts (price, tech stack, rating, downloads) briefly.
 9. For order/purchase status questions, explain what the status means in plain language.
-10. Emphasize verified applications, quality code, and developer-friendly features.`;
+10. Emphasize verified applications, quality code, and developer-friendly features.
+11. When user asks about their purchases/downloads and they ARE logged in, show their actual order history from the database.
+12. When user asks about their purchases/downloads and they ARE NOT logged in, ask them to log in to access personalized features.
+13. Be proactive - if you see orders in the database for a logged-in user, mention them when relevant.
+14. For "trending" queries, show applications sorted by downloads and recent activity.
+15. For "compare" queries, show multiple applications side-by-side with their key differences.
+16. For "support" queries with logged-in users, check their order history first and provide specific help.`;
+
 
 // ── POST /api/vettcode-ai/chat ──────────────────────────────────────────────
 router.post('/chat', async function(req, res) {
