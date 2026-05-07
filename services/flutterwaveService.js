@@ -1,4 +1,5 @@
 const Flutterwave = require('flutterwave-node-v3');
+const axios = require('axios');
 
 const flw = new Flutterwave(
   process.env.FLUTTERWAVE_PUBLIC_KEY,
@@ -7,7 +8,7 @@ const flw = new Flutterwave(
 );
 
 /**
- * Initialize a card payment using Standard/Inline method
+ * Initialize a card payment using direct API call
  */
 async function initializeCardPayment(paymentData) {
   try {
@@ -32,19 +33,28 @@ async function initializeCardPayment(paymentData) {
       },
     };
 
-    // Use the correct method from Flutterwave SDK
-    const response = await flw.Misc.initiate_payment(payload);
+    // Use direct API call
+    const response = await axios.post(
+      'https://api.flutterwave.com/v3/payments',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     
     return {
       success: true,
-      data: response,
-      paymentLink: response.data?.link || response.link,
+      data: response.data,
+      paymentLink: response.data?.data?.link,
     };
   } catch (error) {
-    console.error('Flutterwave card payment error:', error);
+    console.error('Flutterwave card payment error:', error.response?.data || error.message);
     return {
       success: false,
-      message: error.message || 'Failed to initialize card payment',
+      message: error.response?.data?.message || error.message || 'Failed to initialize card payment',
     };
   }
 }
@@ -75,18 +85,27 @@ async function initializeMobileMoneyPayment(paymentData) {
       },
     };
 
-    const response = await flw.Misc.initiate_payment(payload);
+    const response = await axios.post(
+      'https://api.flutterwave.com/v3/payments',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     
     return {
       success: true,
-      data: response,
-      paymentLink: response.data?.link || response.link,
+      data: response.data,
+      paymentLink: response.data?.data?.link,
     };
   } catch (error) {
-    console.error('Flutterwave mobile money error:', error);
+    console.error('Flutterwave mobile money error:', error.response?.data || error.message);
     return {
       success: false,
-      message: error.message || 'Failed to initialize mobile money payment',
+      message: error.response?.data?.message || error.message || 'Failed to initialize mobile money payment',
     };
   }
 }
@@ -116,18 +135,27 @@ async function initializeStandardPayment(paymentData) {
       },
     };
 
-    const response = await flw.Misc.initiate_payment(payload);
+    const response = await axios.post(
+      'https://api.flutterwave.com/v3/payments',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     
     return {
       success: true,
-      data: response,
-      paymentLink: response.data?.link || response.link,
+      data: response.data,
+      paymentLink: response.data?.data?.link,
     };
   } catch (error) {
-    console.error('Flutterwave standard payment error:', error);
+    console.error('Flutterwave standard payment error:', error.response?.data || error.message);
     return {
       success: false,
-      message: error.message || 'Failed to initialize payment',
+      message: error.response?.data?.message || error.message || 'Failed to initialize payment',
     };
   }
 }
