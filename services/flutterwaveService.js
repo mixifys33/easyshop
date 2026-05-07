@@ -16,6 +16,7 @@ async function initializeCardPayment(paymentData) {
       amount: paymentData.amount,
       currency: paymentData.currency || 'UGX',
       redirect_url: paymentData.redirectUrl,
+      payment_options: 'card',
       customer: {
         email: paymentData.customerEmail,
         phonenumber: paymentData.customerPhone,
@@ -31,8 +32,8 @@ async function initializeCardPayment(paymentData) {
       },
     };
 
-    // Use Standard payment (hosted payment page)
-    const response = await flw.PaymentLink.create(payload);
+    // Use the correct method from Flutterwave SDK
+    const response = await flw.Misc.initiate_payment(payload);
     
     return {
       success: true,
@@ -57,25 +58,29 @@ async function initializeMobileMoneyPayment(paymentData) {
       tx_ref: paymentData.txRef,
       amount: paymentData.amount,
       currency: paymentData.currency || 'UGX',
-      email: paymentData.customerEmail,
-      phone_number: paymentData.customerPhone,
-      fullname: paymentData.customerName,
       redirect_url: paymentData.redirectUrl,
+      payment_options: 'mobilemoneyuganda',
+      customer: {
+        email: paymentData.customerEmail,
+        phonenumber: paymentData.customerPhone,
+        name: paymentData.customerName,
+      },
+      customizations: {
+        title: 'VETTCODE Payment',
+        description: paymentData.description || 'Payment for order',
+        logo: 'https://vettcode.vercel.app/icon-192.png',
+      },
+      meta: {
+        orderId: paymentData.orderId,
+      },
     };
 
-    // Add network based on provider
-    if (paymentData.mobileProvider === 'mtn') {
-      payload.network = 'MTN';
-    } else if (paymentData.mobileProvider === 'airtel') {
-      payload.network = 'AIRTEL';
-    }
-
-    const response = await flw.MobileMoney.uganda(payload);
+    const response = await flw.Misc.initiate_payment(payload);
     
     return {
       success: true,
       data: response,
-      paymentLink: response.meta?.authorization?.redirect || response.link,
+      paymentLink: response.data?.link || response.link,
     };
   } catch (error) {
     console.error('Flutterwave mobile money error:', error);
@@ -111,7 +116,7 @@ async function initializeStandardPayment(paymentData) {
       },
     };
 
-    const response = await flw.PaymentLink.create(payload);
+    const response = await flw.Misc.initiate_payment(payload);
     
     return {
       success: true,
