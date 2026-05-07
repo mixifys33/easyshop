@@ -7,7 +7,7 @@ const flw = new Flutterwave(
 );
 
 /**
- * Initialize a card payment
+ * Initialize a card payment using Standard/Inline method
  */
 async function initializeCardPayment(paymentData) {
   try {
@@ -22,18 +22,22 @@ async function initializeCardPayment(paymentData) {
         name: paymentData.customerName,
       },
       customizations: {
-        title: 'EasyShop Payment',
+        title: 'VETTCODE Payment',
         description: paymentData.description || 'Payment for order',
-        logo: 'https://easyshop.com/logo.png',
+        logo: 'https://vettcode.vercel.app/icon-192.png',
       },
-      payment_options: 'card',
+      meta: {
+        orderId: paymentData.orderId,
+      },
     };
 
-    const response = await flw.Charge.card(payload);
+    // Use Standard payment (hosted payment page)
+    const response = await flw.PaymentLink.create(payload);
+    
     return {
       success: true,
       data: response,
-      paymentLink: response.meta?.authorization?.redirect || response.link,
+      paymentLink: response.data?.link || response.link,
     };
   } catch (error) {
     console.error('Flutterwave card payment error:', error);
@@ -98,21 +102,21 @@ async function initializeStandardPayment(paymentData) {
         name: paymentData.customerName,
       },
       customizations: {
-        title: 'EasyShop Payment',
+        title: 'VETTCODE Payment',
         description: paymentData.description || 'Payment for order',
-        logo: 'https://easyshop.com/logo.png',
+        logo: 'https://vettcode.vercel.app/icon-192.png',
       },
       meta: {
         orderId: paymentData.orderId,
       },
     };
 
-    const response = await flw.Charge.card(payload);
+    const response = await flw.PaymentLink.create(payload);
     
     return {
       success: true,
       data: response,
-      paymentLink: response.meta?.authorization?.redirect || response.link,
+      paymentLink: response.data?.link || response.link,
     };
   } catch (error) {
     console.error('Flutterwave standard payment error:', error);
