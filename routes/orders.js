@@ -21,6 +21,7 @@ const orderSchema = new mongoose.Schema({
     price: Number,
     quantity: Number,
     image: String,
+    currency: String,
   }],
   delivery: {
     type: { type: String },
