@@ -521,6 +521,48 @@ router.post('/:id/verify', async (req, res) => {
   }
 });
 
+// GET /api/applications/categories - Get unique categories from applications
+router.get('/categories', async (req, res) => {
+  try {
+    // Get distinct categories from verified, active applications
+    const categories = await Application.distinct('appCategory', {
+      isDraft: false,
+      isActive: true,
+      verificationStatus: 'verified'
+    });
+    
+    // Get distinct subcategories for each category
+    const categoriesWithSubs = await Promise.all(
+      categories.map(async (category) => {
+        const subCategories = await Application.distinct('subCategory', {
+          appCategory: category,
+          isDraft: false,
+          isActive: true,
+          verificationStatus: 'verified',
+          subCategory: { $exists: true, $ne: null, $ne: '' }
+        });
+        
+        return {
+          name: category,
+          subCategories: subCategories.filter(sub => sub) // Remove null/empty values
+        };
+      })
+    );
+    
+    res.json({
+      success: true,
+      categories: categoriesWithSubs.filter(cat => cat.name) // Remove any null categories
+    });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch categories',
+      error: error.message
+    });
+  }
+});
+
 // GET /api/applications/categories/stats - Get category statistics
 router.get('/categories/stats', async (req, res) => {
   try {
