@@ -59,8 +59,19 @@ router.post('/initialize', async (req, res) => {
       redirectUrl,
     } = req.body;
 
+    console.log('[Flutterwave] Initialize request:', {
+      orderId,
+      paymentMethod,
+      amount,
+      currency,
+      customerEmail,
+      customerPhone: customerPhone ? 'provided' : 'missing',
+      customerName: customerName ? 'provided' : 'missing',
+    });
+
     // Validate required fields
     if (!orderId || !amount || !customerEmail) {
+      console.error('[Flutterwave] Missing required fields:', { orderId: !!orderId, amount: !!amount, customerEmail: !!customerEmail });
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: orderId, amount, customerEmail',
