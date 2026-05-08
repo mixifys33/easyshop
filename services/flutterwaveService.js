@@ -230,24 +230,32 @@ function verifyWebhookSignature(signature, payload) {
  */
 async function getTransactionByRef(txRef) {
   try {
-    const response = await flw.Transaction.verify({ tx_ref: txRef });
+    // Use direct API call to get transaction by reference
+    const response = await axios.get(
+      `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${txRef}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+        },
+      }
+    );
     
-    if (response.status === 'success' && response.data) {
+    if (response.data?.status === 'success' && response.data?.data) {
       return {
         success: true,
-        data: response.data,
+        data: response.data.data,
       };
     }
     
     return {
       success: false,
-      message: 'Transaction not found',
+      message: response.data?.message || 'Transaction not found',
     };
   } catch (error) {
-    console.error('Flutterwave get transaction error:', error);
+    console.error('Flutterwave get transaction error:', error.response?.data || error.message);
     return {
       success: false,
-      message: error.message || 'Failed to get transaction',
+      message: error.response?.data?.message || error.message || 'Failed to get transaction',
     };
   }
 }
