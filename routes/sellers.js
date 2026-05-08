@@ -1649,7 +1649,7 @@ router.put('/payment/:sellerId', async (req, res) => {
 router.get(['/', '/public'], async (req, res) => {
   try {
     const { category, minRating, sort, search, limit = 12, cursor } = req.query;
-    const Product = require('../models/Product');
+    const Application = require('../models/Application'); // Use Application model instead of Product
 
     // Only show sellers who have completed shop setup
     const filter = { 'shop.isSetup': true };
@@ -1687,21 +1687,21 @@ router.get(['/', '/public'], async (req, res) => {
     const hasMore = sellers.length > lim;
     const page = sellers.slice(0, lim);
 
-    // Get product counts per seller using ObjectId matching
+    // Get application counts per seller using ObjectId matching
     const sellerObjectIds = page.map(s => s._id);
-    const productCounts = await Product.aggregate([
-      { $match: { sellerId: { $in: sellerObjectIds }, status: 'active', isDraft: { $ne: true } } },
+    const applicationCounts = await Application.aggregate([
+      { $match: { sellerId: { $in: sellerObjectIds }, verificationStatus: { $ne: 'rejected' } } },
       { $group: { _id: '$sellerId', count: { $sum: 1 } } },
     ]);
     const countMap = {};
-    productCounts.forEach(p => { countMap[p._id.toString()] = p.count; });
+    applicationCounts.forEach(p => { countMap[p._id.toString()] = p.count; });
 
     const shops = page.map(s => ({
       id: s._id,
       name: s.shop.shopName || s.name,
       bio: s.shop.shopDescription || '',
       category: s.shop.businessType || 'General',
-      address: [s.shop.city, 'Uganda'].filter(Boolean).join(', '),
+      address: [s.shop.city, 'Worldwide'].filter(Boolean).join(', '),
       ratings: s.metrics?.rating || (s.verified ? 5 : 0),
       reviewCount: s.metrics?.reviewCount || 0,
       productCount: countMap[s._id.toString()] || 0,
