@@ -280,7 +280,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     const payload = req.body;
-    console.log('[Flutterwave] Webhook received:', payload.event);
+    console.log('[Flutterwave] Webhook received:', payload.event, 'status:', payload.data?.status);
 
     // Handle successful charge
     if (payload.event === 'charge.completed' && payload.data) {
@@ -302,6 +302,19 @@ router.post('/webhook', async (req, res) => {
           console.log(`[Flutterwave] Webhook: Payment confirmed for order ${order._id}`);
         } else {
           console.warn(`[Flutterwave] Webhook: Order not found for txRef ${transaction.tx_ref}`);
+        }
+      } else if (transaction.status === 'failed' || transaction.status === 'cancelled') {
+        // Handle failed or cancelled payments
+        const order = await CustomerOrder.findOne({
+          'flutterwaveData.txRef': transaction.tx_ref,
+        });
+
+        if (order) {
+          order.paymentStatus = 'failed';
+          order.status = 'cancelled';
+          await order.save();
+
+          console.log(`[Flutterwave] Webhook: Payment ${transaction.status} for order ${order._id}`);
         }
       }
     }
