@@ -228,13 +228,16 @@ router.get('/verify-ref/:txRef', async (req, res) => {
     });
 
     if (order && verified) {
+      // Update order status even if it was previously cancelled
       order.paymentStatus = 'paid';
       order.status = 'confirmed';
       order.flutterwaveData.transactionId = transaction.id;
       order.flutterwaveData.verifiedAt = new Date();
       await order.save();
 
-      console.log(`[Flutterwave] Payment verified by ref for order ${order._id}`);
+      console.log(`[Flutterwave] Payment verified by ref for order ${order._id}, status updated to confirmed`);
+    } else if (order && !verified) {
+      console.log(`[Flutterwave] Payment not verified for order ${order._id}, transaction status: ${transaction.status}`);
     }
 
     res.json({
