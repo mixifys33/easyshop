@@ -1743,80 +1743,93 @@ router.get(['/detail/:sellerId', '/:sellerId'], async (req, res) => {
   const skip = ['public', 'admin', 'debug', 'profile', 'shop', 'payment', 'register', 'login', 'verify', 'resend-otp', 'forgot-password-seller', 'verify-forgot-password-seller', 'reset-password-seller', 'validate-credentials'];
   if (skip.includes(req.params.sellerId)) return res.status(404).json({ success: false, message: 'Not found' });
   try {
-    const Product = require('../models/Product');
+    const Application = require('../models/Application');
     const { sellerId } = req.params;
     const { sort = 'newest', limit = 12, cursor } = req.query;
 
     const seller = await Seller.findById(sellerId)
-      .select('_id name verified createdAt shop metrics profileImage')
+      .select('_id name email verified createdAt shop metrics profileImage')
       .lean();
 
-    if (!seller || !seller.shop?.isSetup) {
+    if (!seller) {
       return res.status(404).json({ success: false, message: 'Shop not found' });
     }
 
-    // Build product query
-    const productFilter = {
+    // Build application query
+    const applicationFilter = {
       sellerId: sellerId,
-      status: 'active',
-      isDraft: { $ne: true },
+      verificationStatus: { $ne: 'rejected' },
     };
-    if (cursor) productFilter._id = { $gt: cursor };
+    if (cursor) applicationFilter._id = { $gt: cursor };
 
     let sortObj = { createdAt: -1 };
-    if (sort === 'price_asc') sortObj = { salePrice: 1 };
-    else if (sort === 'price_desc') sortObj = { salePrice: -1 };
-    else if (sort === 'rating') sortObj = { ratings: -1 };
+    if (sort === 'price_asc') sortObj = { price: 1 };
+    else if (sort === 'price_desc') sortObj = { price: -1 };
+    else if (sort === 'rating') sortObj = { rating: -1 };
+    else if (sort === 'downloads') sortObj = { downloadCount: -1 };
 
     const lim = Math.min(parseInt(limit) || 12, 50);
-    const products = await Product.find(productFilter)
-      .select('title salePrice regularPrice images category subCategory brand stock ratings slug _id')
+    const applications = await Application.find(applicationFilter)
+      .select('appName price isFree screenshots appCategory technologyStack platforms rating downloadCount verificationStatus _id')
       .sort(sortObj)
       .limit(lim + 1)
       .lean();
 
-    const hasMore = products.length > lim;
-    const productPage = products.slice(0, lim).map(p => ({
-      id: p._id,
-      title: p.title,
-      slug: p.slug,
-      sale_price: p.salePrice,
-      regular_price: p.regularPrice,
-      images: p.images || [],
-      category: p.category,
-      subCategory: p.subCategory,
-      brand: p.brand,
-      stock: p.stock,
-      ratings: p.ratings || 0,
+    const hasMore = applications.length > lim;
+    const applicationPage = applications.slice(0, lim).map(app => ({
+      id: app._id,
+      title: app.appName,
+      slug: app._id, // Use ID as slug for now
+      sale_price: app.price || 0,
+      regular_price: app.price || 0,
+      images: app.screenshots || [],
+      category: app.appCategory,
+      subCategory: app.technologyStack?.[0] || '',
+      brand: app.platforms?.[0] || '',
+      stock: 999, // Digital products always in stock
+      ratings: app.rating || 0,
+      isFree: app.isFree,
+      isVerified: app.verificationStatus === 'verified',
+      downloadCount: app.downloadCount || 0,
     }));
 
-    // Other shops from same city (up to 4)
+    // Other shops with applications (up to 4)
     const otherSellers = await Seller.find({
       _id: { $ne: sellerId },
-      'shop.isSetup': true,
-      'shop.city': seller.shop.city,
-    }).select('_id name shop profileImage verified metrics').limit(4).lean();
+    }).select('_id name email shop profileImage verified metrics').limit(10).lean();
 
-    const otherShops = otherSellers.map(s => ({
-      id: s._id,
-      name: s.shop.shopName || s.name,
-      category: s.shop.businessType || '',
-      avatar: s.profileImage?.url || s.profileImage || s.shop?.logo?.url || null,
-      ratings: s.metrics?.rating || (s.verified ? 5 : 0),
-      isVerified: s.verified || false,
-    }));
+    // Filter to only sellers with applications
+    const sellerIds = otherSellers.map(s => s._id);
+    const appCounts = await Application.aggregate([
+      { $match: { sellerId: { $in: sellerIds }, verificationStatus: { $ne: 'rejected' } } },
+      { $group: { _id: '$sellerId', count: { $sum: 1 } } },
+    ]);
+    const countMap = {};
+    appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+    const otherShops = otherSellers
+      .filter(s => countMap[s._id.toString()] > 0)
+      .slice(0, 4)
+      .map(s => ({
+        id: s._id,
+        name: s.shop?.shopName || s.name || 'Developer',
+        category: s.shop?.businessType || 'Software Developer',
+        avatar: s.profileImage?.url || s.profileImage || s.shop?.logo?.url || null,
+        ratings: s.metrics?.rating || (s.verified ? 5 : 4.5),
+        isVerified: s.verified || false,
+      }));
 
     const shop = {
       id: seller._id,
-      name: seller.shop.shopName || seller.name,
-      bio: seller.shop.shopDescription || '',
-      category: seller.shop.businessType || 'General',
-      address: [seller.shop.businessAddress, seller.shop.city, 'Uganda'].filter(Boolean).join(', '),
-      city: seller.shop.city || '',
-      website: seller.shop.website || '',
-      ratings: seller.metrics?.rating || (seller.verified ? 5 : 0),
+      name: seller.shop?.shopName || seller.name || 'Developer',
+      bio: seller.shop?.shopDescription || `Verified developer with ${applicationPage.length} applications`,
+      category: seller.shop?.businessType || 'Software Developer',
+      address: [seller.shop?.businessAddress, seller.shop?.city, 'Worldwide'].filter(Boolean).join(', ') || 'Worldwide',
+      city: seller.shop?.city || 'Worldwide',
+      website: seller.shop?.website || '',
+      ratings: seller.metrics?.rating || (seller.verified ? 5 : 4.5),
       reviewCount: seller.metrics?.reviewCount || 0,
-      productCount: productPage.length,
+      productCount: applicationPage.length,
       avatar: seller.profileImage?.url || seller.profileImage || seller.shop?.logo?.url || null,
       coverBanner: seller.shop?.banner?.url || null,
       isVerified: seller.verified || false,
@@ -1826,9 +1839,9 @@ router.get(['/detail/:sellerId', '/:sellerId'], async (req, res) => {
     res.json({
       success: true,
       shop,
-      products: productPage,
+      products: applicationPage,
       otherShops,
-      nextProductCursor: hasMore ? productPage[productPage.length - 1]?.id : null,
+      nextProductCursor: hasMore ? applicationPage[applicationPage.length - 1]?.id : null,
       hasMoreProducts: hasMore,
     });
   } catch (err) {
@@ -1841,31 +1854,41 @@ router.get(['/detail/:sellerId', '/:sellerId'], async (req, res) => {
 // Also handles GET /:id/products when mounted at /api/shops
 router.get(['/detail/:sellerId/products', '/:sellerId/products'], async (req, res) => {
   try {
-    const Product = require('../models/Product');
+    const Application = require('../models/Application');
     const { sellerId } = req.params;
     const { sort = 'newest', limit = 12, cursor } = req.query;
 
-    const filter = { sellerId, status: 'active', isDraft: { $ne: true } };
+    const filter = { sellerId, verificationStatus: { $ne: 'rejected' } };
     if (cursor) filter._id = { $gt: cursor };
 
     let sortObj = { createdAt: -1 };
-    if (sort === 'price_asc') sortObj = { salePrice: 1 };
-    else if (sort === 'price_desc') sortObj = { salePrice: -1 };
-    else if (sort === 'rating') sortObj = { ratings: -1 };
+    if (sort === 'price_asc') sortObj = { price: 1 };
+    else if (sort === 'price_desc') sortObj = { price: -1 };
+    else if (sort === 'rating') sortObj = { rating: -1 };
+    else if (sort === 'downloads') sortObj = { downloadCount: -1 };
 
     const lim = Math.min(parseInt(limit) || 12, 50);
-    const products = await Product.find(filter)
-      .select('title salePrice regularPrice images category subCategory brand stock ratings slug _id')
+    const applications = await Application.find(filter)
+      .select('appName price isFree screenshots appCategory technologyStack platforms rating downloadCount verificationStatus _id')
       .sort(sortObj)
       .limit(lim + 1)
       .lean();
 
-    const hasMore = products.length > lim;
-    const page = products.slice(0, lim).map(p => ({
-      id: p._id, title: p.title, slug: p.slug,
-      sale_price: p.salePrice, regular_price: p.regularPrice,
-      images: p.images || [], category: p.category,
-      brand: p.brand, stock: p.stock, ratings: p.ratings || 0,
+    const hasMore = applications.length > lim;
+    const page = applications.slice(0, lim).map(app => ({
+      id: app._id,
+      title: app.appName,
+      slug: app._id,
+      sale_price: app.price || 0,
+      regular_price: app.price || 0,
+      images: app.screenshots || [],
+      category: app.appCategory,
+      brand: app.platforms?.[0] || '',
+      stock: 999,
+      ratings: app.rating || 0,
+      isFree: app.isFree,
+      isVerified: app.verificationStatus === 'verified',
+      downloadCount: app.downloadCount || 0,
     }));
 
     res.json({ success: true, products: page, hasMore, nextCursor: hasMore ? page[page.length - 1]?.id : null });
