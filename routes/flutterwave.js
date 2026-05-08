@@ -222,22 +222,44 @@ router.get('/verify-ref/:txRef', async (req, res) => {
     const transaction = result.data;
     const verified = transaction.status === 'successful';
 
-    // Find and update order
-    const order = await CustomerOrder.findOne({
+    // Find order - first try by flutterwaveData.txRef, then by extracting orderId from txRef
+    let order = await CustomerOrder.findOne({
       'flutterwaveData.txRef': txRef,
     });
+
+    // If not found, try to extract orderId from txRef (format: EASYSHOP-{orderId}-{timestamp})
+    if (!order) {
+      const parts = txRef.split('-');
+      if (parts.length >= 3 && parts[0] === 'EASYSHOP') {
+        const orderId = parts.slice(1, -1).join('-'); // Get everything between EASYSHOP and timestamp
+        order = await CustomerOrder.findById(orderId);
+        
+        if (order) {
+          console.log(`[Flutterwave] Found order by extracting ID from txRef: ${orderId}`);
+          // Initialize flutterwaveData if it doesn't exist
+          if (!order.flutterwaveData) {
+            order.flutterwaveData = {};
+          }
+          order.flutterwaveData.txRef = txRef;
+        }
+      }
+    }
 
     if (order && verified) {
       // Update order status even if it was previously cancelled
       order.paymentStatus = 'paid';
       order.status = 'confirmed';
+      if (!order.flutterwaveData) order.flutterwaveData = {};
       order.flutterwaveData.transactionId = transaction.id;
       order.flutterwaveData.verifiedAt = new Date();
+      order.flutterwaveData.txRef = txRef;
       await order.save();
 
       console.log(`[Flutterwave] Payment verified by ref for order ${order._id}, status updated to confirmed`);
     } else if (order && !verified) {
       console.log(`[Flutterwave] Payment not verified for order ${order._id}, transaction status: ${transaction.status}`);
+    } else if (!order) {
+      console.log(`[Flutterwave] No order found for txRef: ${txRef}`);
     }
 
     res.json({
