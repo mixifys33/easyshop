@@ -1651,8 +1651,8 @@ router.get(['/', '/public'], async (req, res) => {
     const { category, minRating, sort, search, limit = 12, cursor } = req.query;
     const Application = require('../models/Application'); // Use Application model instead of Product
 
-    // Only show sellers who have completed shop setup
-    const filter = { 'shop.isSetup': true };
+    // Show all sellers (removed shop.isSetup filter to show sellers with applications)
+    const filter = {};
 
     if (category && category !== 'All Categories') {
       filter['shop.businessType'] = new RegExp(category, 'i');
@@ -1660,6 +1660,8 @@ router.get(['/', '/public'], async (req, res) => {
 
     if (search) {
       filter.$or = [
+        { name: new RegExp(search, 'i') },
+        { email: new RegExp(search, 'i') },
         { 'shop.shopName': new RegExp(search, 'i') },
         { 'shop.shopDescription': new RegExp(search, 'i') },
         { 'shop.city': new RegExp(search, 'i') },
@@ -1673,13 +1675,13 @@ router.get(['/', '/public'], async (req, res) => {
 
     let sortObj = { createdAt: -1 };
     if (sort === 'rating') sortObj = { 'metrics.rating': -1 };
-    else if (sort === 'name_asc') sortObj = { 'shop.shopName': 1 };
+    else if (sort === 'name_asc') sortObj = { name: 1 };
     else if (sort === 'newest') sortObj = { createdAt: -1 };
 
     const lim = Math.min(parseInt(limit) || 12, 50);
 
     const sellers = await Seller.find(filter)
-      .select('_id name verified createdAt shop metrics profileImage')
+      .select('_id name email verified createdAt shop metrics profileImage')
       .sort(sortObj)
       .limit(lim + 1)
       .lean();
@@ -1696,33 +1698,36 @@ router.get(['/', '/public'], async (req, res) => {
     const countMap = {};
     applicationCounts.forEach(p => { countMap[p._id.toString()] = p.count; });
 
-    const shops = page.map(s => ({
-      id: s._id,
-      name: s.shop.shopName || s.name,
-      bio: s.shop.shopDescription || '',
-      category: s.shop.businessType || 'General',
-      address: [s.shop.city, 'Worldwide'].filter(Boolean).join(', '),
-      ratings: s.metrics?.rating || (s.verified ? 5 : 0),
-      reviewCount: s.metrics?.reviewCount || 0,
-      productCount: countMap[s._id.toString()] || 0,
-      // avatar: seller profile image first, then shop logo, then thumbnail
-      avatar: s.profileImage?.url || (typeof s.profileImage === 'string' && s.profileImage ? s.profileImage : null) || s.shop?.logo?.url || s.shop?.logo?.thumbnailUrl || null,
-      // coverBanner: shop banner image
-      coverBanner: s.shop?.banner?.url || s.shop?.banner?.thumbnailUrl || null,
-      isVerified: s.verified || false,
-      createdAt: s.createdAt,
-    }));
+    // Only include sellers who have at least one application
+    const shopsWithApps = page
+      .filter(s => countMap[s._id.toString()] > 0)
+      .map(s => ({
+        id: s._id,
+        name: s.shop?.shopName || s.name || 'Developer',
+        bio: s.shop?.shopDescription || `Verified developer with ${countMap[s._id.toString()]} applications`,
+        category: s.shop?.businessType || 'Software Developer',
+        address: [s.shop?.city, 'Worldwide'].filter(Boolean).join(', ') || 'Worldwide',
+        ratings: s.metrics?.rating || (s.verified ? 5 : 4.5),
+        reviewCount: s.metrics?.reviewCount || 0,
+        productCount: countMap[s._id.toString()] || 0,
+        // avatar: seller profile image first, then shop logo, then thumbnail
+        avatar: s.profileImage?.url || (typeof s.profileImage === 'string' && s.profileImage ? s.profileImage : null) || s.shop?.logo?.url || s.shop?.logo?.thumbnailUrl || null,
+        // coverBanner: shop banner image
+        coverBanner: s.shop?.banner?.url || s.shop?.banner?.thumbnailUrl || null,
+        isVerified: s.verified || false,
+        createdAt: s.createdAt,
+      }));
 
     // Apply minRating filter after aggregation (since rating is in metrics)
     const filtered = minRating
-      ? shops.filter(s => s.ratings >= parseFloat(minRating))
-      : shops;
+      ? shopsWithApps.filter(s => s.ratings >= parseFloat(minRating))
+      : shopsWithApps;
 
     res.json({
       success: true,
       shops: filtered,
-      hasMore,
-      nextCursor: hasMore ? page[page.length - 1]._id : null,
+      hasMore: hasMore && filtered.length > 0,
+      nextCursor: hasMore && filtered.length > 0 ? page[page.length - 1]._id : null,
       total: filtered.length,
     });
   } catch (err) {
