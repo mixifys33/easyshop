@@ -92,6 +92,124 @@ const applicationSchema = new mongoose.Schema({
     uploaded: Boolean
   },
 
+  // Seller Information
+  sellerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Seller',
+    required: true
+  },
+
+  // Pricing
+  price: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  currency: {
+    type: String,
+    default: 'USD',
+    enum: ['USD', 'EUR', 'GBP', 'UGX', 'KES', 'TZS', 'RWF']
+  },
+  isFree: {
+    type: Boolean,
+    default: false
+  },
+  licenseType: {
+    type: String,
+    default: 'MIT License'
+  },
+
+  // Platform & Dependencies
+  supportedPlatforms: [{
+    type: String,
+    trim: true
+  }],
+  dependencies: [{
+    type: String,
+    trim: true
+  }],
+
+  // Commercial Terms
+  commercialUse: {
+    type: String,
+    default: 'Yes',
+    enum: ['Yes', 'No', 'With License']
+  },
+  resaleRights: {
+    type: String,
+    default: 'No',
+    enum: ['Yes', 'No', 'With License']
+  },
+  supportLevel: {
+    type: String,
+    default: 'Community',
+    enum: ['Community', 'Email', 'Priority', 'Enterprise']
+  },
+  updateFrequency: {
+    type: String,
+    default: 'Active',
+    enum: ['Active', 'Maintenance', 'Deprecated']
+  },
+  warranty: {
+    type: String,
+    default: '30 days'
+  },
+  installationSupport: {
+    type: String,
+    default: 'Yes',
+    enum: ['Yes', 'No', 'Paid']
+  },
+
+  // Status & Verification
+  isDraft: {
+    type: Boolean,
+    default: false
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  verificationStatus: {
+    type: String,
+    default: 'pending',
+    enum: ['pending', 'verified', 'rejected']
+  },
+  verificationNotes: {
+    type: String,
+    trim: true
+  },
+
+  // Draft Management
+  draftExpiresAt: {
+    type: Date
+  },
+
+  // Statistics
+  views: {
+    type: Number,
+    default: 0
+  },
+  downloads: {
+    type: Number,
+    default: 0
+  },
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  reviewCount: {
+    type: Number,
+    default: 0
+  },
+
+  // Bulk Upload
+  bulkUploaded: {
+    type: Boolean,
+    default: false
+  },
+
   // Technical Details
   slug: {
     type: String,
