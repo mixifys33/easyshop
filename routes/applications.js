@@ -347,9 +347,33 @@ router.post('/draft', async (req, res) => {
     const draftExpiresAt = new Date();
     draftExpiresAt.setDate(draftExpiresAt.getDate() + 14);
     
-    // Create draft
+    // Create draft with minimal required fields
     const draft = new Application({
-      ...draftData,
+      appName: draftData.appName,
+      shortDescription: draftData.shortDescription || 'Draft - No description yet',
+      detailedDescription: draftData.detailedDescription || 'Draft - No detailed description yet',
+      appCategory: draftData.appCategory || 'Other',
+      tags: draftData.tags || '',
+      technologyStack: draftData.technologyStack || [],
+      liveDemo: draftData.liveDemo || '',
+      githubRepo: draftData.githubRepo || '',
+      documentationUrl: draftData.documentationUrl || '',
+      videoDemo: draftData.videoDemo || '',
+      screenshots: draftData.screenshots || [],
+      appIcon: draftData.appIcon || null,
+      supportedPlatforms: draftData.supportedPlatforms || [],
+      dependencies: draftData.dependencies || [],
+      licenseType: draftData.licenseType || 'MIT License',
+      isFree: draftData.isFree !== undefined ? draftData.isFree : true,
+      price: draftData.price || 0,
+      currency: draftData.currency || 'USD',
+      commercialUse: draftData.commercialUse || 'Yes',
+      resaleRights: draftData.resaleRights || 'No',
+      supportLevel: draftData.supportLevel || 'Community',
+      updateFrequency: draftData.updateFrequency || 'Active',
+      warranty: draftData.warranty || '30 days',
+      installationSupport: draftData.installationSupport || 'Yes',
+      sellerId: draftData.sellerId,
       isDraft: true,
       draftExpiresAt,
       verificationStatus: 'pending'
