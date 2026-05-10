@@ -28,7 +28,6 @@ const validateApplicationData = (data, isDraft = false) => {
       errors.push('At least one technology is required');
     }
     if (!data.liveDemo?.trim()) errors.push('Live demo URL is required');
-    if (!data.githubRepo?.trim()) errors.push('GitHub repository URL is required');
     if (!data.licenseType) errors.push('License type is required');
     // Price validation: if not free, price must be provided and > 0
     if (!data.isFree && (data.price === undefined || data.price === null)) {
@@ -42,9 +41,6 @@ const validateApplicationData = (data, isDraft = false) => {
     // URL validation
     if (data.liveDemo && !isValidUrl(data.liveDemo)) {
       errors.push('Live demo URL is not valid');
-    }
-    if (data.githubRepo && !isValidUrl(data.githubRepo)) {
-      errors.push('GitHub repository URL is not valid');
     }
     if (data.documentationUrl && !isValidUrl(data.documentationUrl)) {
       errors.push('Documentation URL is not valid');
@@ -356,7 +352,6 @@ router.post('/draft', async (req, res) => {
       tags: draftData.tags || '',
       technologyStack: draftData.technologyStack || [],
       liveDemo: draftData.liveDemo || '',
-      githubRepo: draftData.githubRepo || '',
       documentationUrl: draftData.documentationUrl || '',
       videoDemo: draftData.videoDemo || '',
       screenshots: draftData.screenshots || [],
@@ -662,88 +657,7 @@ router.post('/:id/download', async (req, res) => {
   }
 });
 
-// GET /api/applications/:id/distribution - Get distribution settings for an application
-router.get('/:id/distribution', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid application ID'
-      });
-    }
-    
-    const application = await Application.findById(id);
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: 'Application not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      distribution: application.distribution || {}
-    });
-  } catch (error) {
-    console.error('Error fetching distribution settings:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch distribution settings',
-      error: error.message
-    });
-  }
-});
 
-// PUT /api/applications/:id/distribution - Update distribution settings for an application
-router.put('/:id/distribution', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { distribution } = req.body;
-    
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid application ID'
-      });
-    }
-    
-    if (!distribution) {
-      return res.status(400).json({
-        success: false,
-        message: 'Distribution settings are required'
-      });
-    }
-    
-    const application = await Application.findById(id);
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: 'Application not found'
-      });
-    }
-    
-    // Update distribution settings
-    application.distribution = distribution;
-    application.updatedAt = new Date();
-    
-    await application.save();
-    
-    res.json({
-      success: true,
-      message: 'Distribution settings updated successfully',
-      distribution: application.distribution
-    });
-  } catch (error) {
-    console.error('Error updating distribution settings:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update distribution settings',
-      error: error.message
-    });
-  }
-});
 
 // ── BULK UPLOAD ROUTES ────────────────────────────────────────────────────────
 

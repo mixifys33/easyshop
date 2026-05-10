@@ -331,4 +331,79 @@ router.get('/file/:fileId', async (req, res) => {
   }
 });
 
+/**
+ * Upload application ZIP file endpoint
+ */
+router.post('/upload-application', async (req, res) => {
+  console.log('📤 Application ZIP upload endpoint hit');
+  
+  try {
+    // Check if ImageKit is properly initialized
+    if (!imagekit) {
+      console.error('❌ ImageKit not initialized');
+      return res.status(500).json({ 
+        error: 'ImageKit service not available',
+        message: 'File upload service is not properly configured' 
+      });
+    }
+
+    if (typeof imagekit.files?.upload !== 'function') {
+      console.error('❌ ImageKit upload method not available');
+      return res.status(500).json({ 
+        error: 'ImageKit upload method not available',
+        message: 'File upload functionality is not working' 
+      });
+    }
+
+    const { file, fileName } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Check file size (base64 length approximation)
+    const fileSizeApprox = file.length * 0.75; // base64 is ~33% larger than binary
+    const maxSize = 100 * 1024 * 1024; // 100MB limit for application files
+    
+    if (fileSizeApprox > maxSize) {
+      return res.status(400).json({ 
+        error: 'File too large',
+        message: `File size (${Math.round(fileSizeApprox / 1024 / 1024)}MB) exceeds maximum allowed size (100MB)` 
+      });
+    }
+
+    const uploadOptions = {
+      file: file, // base64 string
+      fileName: fileName || `application_${Date.now()}.zip`,
+      folder: 'applications',
+      useUniqueFileName: true,
+      tags: ['application', 'source-code']
+    };
+
+    console.log(`📤 Uploading application file: ${uploadOptions.fileName} to folder: ${uploadOptions.folder}`);
+    
+    const result = await imagekit.files.upload(uploadOptions);
+    console.log(`✅ Application file uploaded successfully: ${result.fileId}`);
+
+    res.json({
+      success: true,
+      fileId: result.fileId,
+      url: result.url,
+      fileName: result.name,
+      fileSize: result.size,
+      filePath: result.filePath
+    });
+
+  } catch (error) {
+    console.error('❌ ImageKit application upload error:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    res.status(500).json({ 
+      error: 'Failed to upload application file',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;
