@@ -186,8 +186,8 @@ const validatePassword = (password) => {
 };
 
 // Seller registration endpoint
-// Seller registration endpoint
-router.post('/register', async (req, res) => {
+// Seller registration endpoint (also available as /signup for frontend compatibility)
+const handleSellerRegistration = async (req, res) => {
   try {
     const { name, email, phoneNumber, password, applicationNote } = req.body;
     
@@ -282,7 +282,11 @@ router.post('/register', async (req, res) => {
       error: 'Something went wrong. Please try again.'
     });
   }
-});
+};
+
+// Register both /register and /signup endpoints
+router.post('/register', handleSellerRegistration);
+router.post('/signup', handleSellerRegistration);
 
 // OTP verification endpoint
 router.post('/verify', async (req, res) => {
