@@ -442,7 +442,22 @@ router.put('/:id', async (req, res) => {
       application.verificationStatus = 'pending';
     }
     
-    await application.save();
+    // Save with error handling
+    try {
+      await application.save();
+    } catch (saveError) {
+      console.error('Error saving application:', saveError);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to save application',
+        error: saveError.message,
+        details: saveError.errors ? Object.keys(saveError.errors).map(key => ({
+          field: key,
+          message: saveError.errors[key].message
+        })) : []
+      });
+    }
+    
     await application.populate('sellerId', 'name email shopName');
     
     res.json({

@@ -339,9 +339,15 @@ applicationSchema.methods.incrementViews = async function() {
 };
 
 // Instance method to increment downloads
-applicationSchema.methods.incrementDownloads = function() {
-  this.downloads += 1;
-  return this.save();
+applicationSchema.methods.incrementDownloads = async function() {
+  try {
+    this.downloads = (this.downloads || 0) + 1;
+    return await this.save({ validateBeforeSave: false });
+  } catch (error) {
+    console.error('Error incrementing downloads:', error);
+    // Return the document even if save fails
+    return this;
+  }
 };
 
 module.exports = mongoose.model('Application', applicationSchema);
