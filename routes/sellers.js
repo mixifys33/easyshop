@@ -602,7 +602,85 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Forgot Password - Send OTP
+// Forgot Password - Send OTP (Frontend endpoint)
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        message: 'Email is required',
+        error: 'Please provide your email address'
+      });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: 'Invalid email format',
+        error: 'Please enter a valid email address'
+      });
+    }
+    
+    // Check if seller exists
+    const seller = await Seller.findOne({ email: email.toLowerCase() });
+    if (!seller) {
+      return res.status(404).json({
+        message: 'Account not found',
+        error: 'No seller account found with this email address'
+      });
+    }
+    
+    // Check if account is verified
+    if (!seller.verified) {
+      return res.status(400).json({
+        message: 'Account not verified',
+        error: 'Please verify your account first before resetting password'
+      });
+    }
+    
+    // Generate OTP for password reset
+    const otp = generateOTP();
+    
+    // Store OTP with expiration (10 minutes)
+    forgotPasswordStorage.set(email, {
+      otp: otp,
+      expires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      attempts: 0,
+      verified: false
+    });
+    
+    console.log('Password reset OTP generated for:', email, 'OTP:', otp);
+    
+    // Send OTP email
+    const emailResult = await sendOTPEmail(email, seller.name, otp, 'Password Reset');
+    
+    if (!emailResult.success) {
+      console.log('Failed to send password reset email:', emailResult.error);
+      return res.status(500).json({
+        message: 'Failed to send reset email',
+        error: 'Please try again or contact support'
+      });
+    }
+    
+    console.log('Password reset OTP email sent successfully to:', email);
+    
+    res.status(200).json({
+      message: 'Password reset code sent to your email',
+      success: true
+    });
+    
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: 'Something went wrong. Please try again.'
+    });
+  }
+});
+
+// Forgot Password - Send OTP (Legacy endpoint)
 router.post('/forgot-password-seller', async (req, res) => {
   try {
     const { email } = req.body;
@@ -680,7 +758,77 @@ router.post('/forgot-password-seller', async (req, res) => {
   }
 });
 
-// Verify Forgot Password OTP
+// Verify Forgot Password OTP (Frontend endpoint)
+router.post('/verify-forgot-password', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({
+        message: 'Email and OTP are required',
+        error: 'Missing required fields'
+      });
+    }
+    
+    // Get stored OTP data
+    const storedData = forgotPasswordStorage.get(email);
+    
+    if (!storedData) {
+      return res.status(400).json({
+        message: 'No password reset request found',
+        error: 'Please request a new password reset'
+      });
+    }
+    
+    // Check if OTP has expired
+    if (Date.now() > storedData.expires) {
+      forgotPasswordStorage.delete(email);
+      return res.status(400).json({
+        message: 'Reset code has expired',
+        error: 'Please request a new password reset'
+      });
+    }
+    
+    // Verify OTP
+    if (storedData.otp !== otp) {
+      storedData.attempts += 1;
+      
+      // Limit attempts to prevent brute force
+      if (storedData.attempts >= 5) {
+        forgotPasswordStorage.delete(email);
+        return res.status(429).json({
+          message: 'Too many failed attempts',
+          error: 'Password reset request has been cancelled due to too many failed attempts. Please start over.'
+        });
+      }
+      
+      return res.status(400).json({
+        message: 'Invalid reset code',
+        error: `Incorrect code. ${5 - storedData.attempts} attempts remaining.`,
+        attemptsRemaining: 5 - storedData.attempts
+      });
+    }
+    
+    // Mark as verified
+    storedData.verified = true;
+    
+    console.log('Password reset OTP verified for:', email);
+    
+    res.status(200).json({
+      message: 'Reset code verified successfully',
+      success: true
+    });
+    
+  } catch (error) {
+    console.error('Verify forgot password OTP error:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: 'Something went wrong. Please try again.'
+    });
+  }
+});
+
+// Verify Forgot Password OTP (Legacy endpoint)
 router.post('/verify-forgot-password-seller', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -750,7 +898,79 @@ router.post('/verify-forgot-password-seller', async (req, res) => {
   }
 });
 
-// Reset Password
+// Reset Password (Frontend endpoint)
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        message: 'Email and new password are required',
+        error: 'Missing required fields'
+      });
+    }
+    
+    // Check if OTP was verified
+    const resetData = forgotPasswordStorage.get(email);
+    if (!resetData || !resetData.verified) {
+      return res.status(400).json({
+        message: 'Password reset not authorized',
+        error: 'Please verify your reset code first'
+      });
+    }
+    
+    // Check if reset session has expired
+    if (Date.now() > resetData.expires) {
+      forgotPasswordStorage.delete(email);
+      return res.status(400).json({
+        message: 'Reset session has expired',
+        error: 'Please start the password reset process again'
+      });
+    }
+    
+    // Validate new password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        message: 'Password does not meet security requirements',
+        error: passwordValidation.errors.join('. ')
+      });
+    }
+    
+    // Get seller account
+    const seller = await Seller.findOne({ email: email.toLowerCase() });
+    if (!seller) {
+      return res.status(404).json({
+        message: 'Account not found',
+        error: 'Seller account not found'
+      });
+    }
+    
+    // Update seller password (let pre-save middleware handle hashing)
+    seller.password = newPassword;
+    seller.passwordResetAt = new Date();
+    await seller.save();
+    
+    // Clean up reset data
+    forgotPasswordStorage.delete(email);
+    
+    console.log('Password reset successfully for:', email);
+    
+    res.status(200).json({
+      message: 'Password reset successfully',
+      success: true
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: 'Something went wrong. Please try again.'
+    });
+  }
+});
+
+// Reset Password (Legacy endpoint)
 router.post('/reset-password-seller', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
