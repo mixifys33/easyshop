@@ -172,6 +172,7 @@ router.post('/upload', async (req, res) => {
       url: result.url,
       thumbnailUrl: result.thumbnailUrl,
       name: result.name,
+      fileName: result.name, // Add fileName for frontend compatibility
       size: result.size,
       filePath: result.filePath
     });
