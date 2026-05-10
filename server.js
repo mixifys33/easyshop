@@ -32,7 +32,6 @@ const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
 const applicationRoutes = require('./routes/applications');
 const flutterwaveRoutes = require('./routes/flutterwave');
-const uploadRoutes = require('./routes/upload');
 
 const app = express();
 const server = http.createServer(app);
@@ -255,7 +254,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/flutterwave', flutterwaveRoutes);
-app.use('/api/upload', uploadRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);
