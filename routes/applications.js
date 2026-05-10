@@ -27,7 +27,6 @@ const validateApplicationData = (data, isDraft = false) => {
     if (!data.technologyStack || data.technologyStack.length === 0) {
       errors.push('At least one technology is required');
     }
-    if (!data.liveDemo?.trim()) errors.push('Live demo URL is required');
     if (!data.licenseType) errors.push('License type is required');
     // Price validation: if not free, price must be provided and > 0
     if (!data.isFree && (data.price === undefined || data.price === null)) {
@@ -38,7 +37,7 @@ const validateApplicationData = (data, isDraft = false) => {
     }
     if (!data.sellerId) errors.push('Seller ID is required');
     
-    // URL validation
+    // URL validation (only validate if provided)
     if (data.liveDemo && !isValidUrl(data.liveDemo)) {
       errors.push('Live demo URL is not valid');
     }
