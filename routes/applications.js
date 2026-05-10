@@ -236,9 +236,14 @@ router.get('/:id', async (req, res) => {
       });
     }
     
-    // Increment views for non-draft applications
+    // Increment views for non-draft applications (don't fail if this errors)
     if (!application.isDraft) {
-      await application.incrementViews();
+      try {
+        await application.incrementViews();
+      } catch (viewError) {
+        console.error('Error incrementing views:', viewError);
+        // Continue anyway - don't fail the request
+      }
     }
     
     res.json({

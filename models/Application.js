@@ -327,9 +327,15 @@ applicationSchema.statics.searchApplications = function(query, filters = {}) {
 };
 
 // Instance method to increment views
-applicationSchema.methods.incrementViews = function() {
-  this.views += 1;
-  return this.save();
+applicationSchema.methods.incrementViews = async function() {
+  try {
+    this.views = (this.views || 0) + 1;
+    return await this.save({ validateBeforeSave: false });
+  } catch (error) {
+    console.error('Error incrementing views:', error);
+    // Return the document even if save fails
+    return this;
+  }
 };
 
 // Instance method to increment downloads
