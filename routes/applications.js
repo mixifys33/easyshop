@@ -494,11 +494,81 @@ router.delete('/:id', async (req, res) => {
       });
     }
     
+    // Initialize ImageKit for deleting files
+    let imagekit = null;
+    try {
+      const ImageKit = require('@imagekit/nodejs');
+      imagekit = new ImageKit({
+        publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+        privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+        urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+      });
+    } catch (error) {
+      console.error('ImageKit initialization failed:', error.message);
+    }
+    
+    // Delete images from ImageKit
+    const deletionErrors = [];
+    
+    if (imagekit && typeof imagekit.files?.delete === 'function') {
+      try {
+        // Delete app icon from ImageKit
+        if (application.appIcon?.fileId) {
+          try {
+            await imagekit.files.delete(application.appIcon.fileId);
+            console.log(`✅ Deleted app icon: ${application.appIcon.fileId}`);
+          } catch (error) {
+            console.error(`❌ Failed to delete app icon: ${application.appIcon.fileId}`, error.message);
+            deletionErrors.push(`App icon: ${error.message}`);
+          }
+        }
+        
+        // Delete screenshots from ImageKit
+        if (application.screenshots && Array.isArray(application.screenshots)) {
+          for (const screenshot of application.screenshots) {
+            if (screenshot.fileId) {
+              try {
+                await imagekit.files.delete(screenshot.fileId);
+                console.log(`✅ Deleted screenshot: ${screenshot.fileId}`);
+              } catch (error) {
+                console.error(`❌ Failed to delete screenshot: ${screenshot.fileId}`, error.message);
+                deletionErrors.push(`Screenshot: ${error.message}`);
+              }
+            }
+          }
+        }
+        
+        // Delete source code file from ImageKit
+        if (application.sourceCodeFile?.fileId) {
+          try {
+            await imagekit.files.delete(application.sourceCodeFile.fileId);
+            console.log(`✅ Deleted source code file: ${application.sourceCodeFile.fileId}`);
+          } catch (error) {
+            console.error(`❌ Failed to delete source code file: ${application.sourceCodeFile.fileId}`, error.message);
+            deletionErrors.push(`Source code file: ${error.message}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error during ImageKit cleanup:', error);
+        // Continue with database deletion even if ImageKit cleanup fails
+      }
+    } else {
+      console.warn('⚠️ ImageKit not available for file deletion');
+    }
+    
+    // Delete application from database
     await Application.findByIdAndDelete(id);
+    
+    // Prepare response message
+    let message = 'Application deleted successfully';
+    if (deletionErrors.length > 0) {
+      message += ` (Note: Some images could not be deleted from ImageKit: ${deletionErrors.join(', ')})`;
+    }
     
     res.json({
       success: true,
-      message: 'Application deleted successfully'
+      message: message,
+      imageDeletionErrors: deletionErrors.length > 0 ? deletionErrors : undefined
     });
   } catch (error) {
     console.error('Error deleting application:', error);
