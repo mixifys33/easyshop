@@ -264,6 +264,14 @@ router.post('/', async (req, res) => {
   try {
     const applicationData = req.body;
     
+    // DEBUG: Log received data
+    console.log('=== BACKEND: Creating Application ===');
+    console.log('Received sourceCodeFile:', JSON.stringify(applicationData.sourceCodeFile, null, 2));
+    console.log('Has sourceCodeFile:', !!applicationData.sourceCodeFile);
+    console.log('sourceCodeFile.url:', applicationData.sourceCodeFile?.url);
+    console.log('sourceCodeFile.fileId:', applicationData.sourceCodeFile?.fileId);
+    console.log('====================================');
+    
     // Validate seller exists
     const seller = await Seller.findById(applicationData.sellerId);
     if (!seller) {
@@ -291,7 +299,17 @@ router.post('/', async (req, res) => {
       publishedAt: new Date()
     });
     
+    // DEBUG: Log what's being saved
+    console.log('=== BACKEND: Saving to Database ===');
+    console.log('Application sourceCodeFile before save:', JSON.stringify(application.sourceCodeFile, null, 2));
+    console.log('===================================');
+    
     await application.save();
+    
+    // DEBUG: Log what was saved
+    console.log('=== BACKEND: After Save ===');
+    console.log('Saved sourceCodeFile:', JSON.stringify(application.sourceCodeFile, null, 2));
+    console.log('===========================');
     
     // Populate seller info for response
     await application.populate('sellerId', 'name email shopName');
@@ -360,6 +378,7 @@ router.post('/draft', async (req, res) => {
       videoDemo: draftData.videoDemo || '',
       screenshots: draftData.screenshots || [],
       appIcon: draftData.appIcon || null,
+      sourceCodeFile: draftData.sourceCodeFile || null,  // ADD THIS LINE
       supportedPlatforms: draftData.supportedPlatforms || [],
       dependencies: draftData.dependencies || [],
       licenseType: draftData.licenseType || 'MIT License',

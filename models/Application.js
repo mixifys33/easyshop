@@ -89,7 +89,8 @@ const applicationSchema = new mongoose.Schema({
     fileId: String,
     fileName: String,
     fileSize: Number,
-    uploaded: Boolean
+    uploaded: Boolean,
+    originalFileCount: Number  // For folder uploads
   },
 
   // Seller Information
