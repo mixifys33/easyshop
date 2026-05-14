@@ -488,8 +488,25 @@ router.get('/applications/:id', adminAuth, async (req, res) => {
 router.patch('/applications/:id/review', adminAuth, async (req, res) => {
   try {
     const { status, adminRating, completionScore, badges, boostLabel, reason, adminNotes, customLabel } = req.body;
+    
+    console.log('[Admin] Review request:', {
+      applicationId: req.params.id,
+      status,
+      adminRating,
+      completionScore,
+      badges,
+      boostLabel,
+      reason,
+      adminNotes,
+      customLabel,
+      adminId: req.adminId
+    });
+    
     const app = await Application.findById(req.params.id);
-    if (!app) return res.status(404).json({ error: 'Application not found' });
+    if (!app) {
+      console.error('[Admin] Application not found:', req.params.id);
+      return res.status(404).json({ error: 'Application not found' });
+    }
 
     if (status) app.verificationStatus = status;
     if (adminRating !== undefined) app.adminRating = Number(adminRating);
@@ -502,11 +519,27 @@ router.patch('/applications/:id/review', adminAuth, async (req, res) => {
     app.reviewedAt = new Date();
     app.reviewedBy = req.adminId;
 
+    console.log('[Admin] Saving application with updates...');
     await app.save();
+    
+    console.log('[Admin] Application saved successfully');
     res.json({ success: true, message: `Application ${status || 'updated'} successfully`, application: app });
   } catch (err) {
     console.error('[Admin] Review application error:', err);
-    res.status(500).json({ error: 'Failed to review application' });
+    console.error('[Admin] Error stack:', err.stack);
+    console.error('[Admin] Error details:', {
+      name: err.name,
+      message: err.message,
+      errors: err.errors
+    });
+    res.status(500).json({ 
+      error: 'Failed to review application',
+      details: err.message,
+      validationErrors: err.errors ? Object.keys(err.errors).map(key => ({
+        field: key,
+        message: err.errors[key].message
+      })) : []
+    });
   }
 });
 
