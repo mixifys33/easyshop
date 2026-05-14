@@ -180,6 +180,43 @@ const applicationSchema = new mongoose.Schema({
     trim: true
   },
 
+  // Admin Review Fields
+  adminRating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  adminNotes: {
+    type: String,
+    trim: true
+  },
+  completionScore: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  badges: [{
+    type: String,
+    trim: true
+  }],
+  boostLabel: {
+    type: String,
+    trim: true
+  },
+  customLabel: {
+    type: String,
+    trim: true
+  },
+  reviewedAt: {
+    type: Date
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+
   // Draft Management
   draftExpiresAt: {
     type: Date
