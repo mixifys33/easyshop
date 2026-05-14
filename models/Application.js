@@ -213,8 +213,8 @@ const applicationSchema = new mongoose.Schema({
     type: Date
   },
   reviewedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin'
+    type: String,  // Changed from ObjectId to String to avoid reference issues
+    trim: true
   },
 
   // Draft Management
