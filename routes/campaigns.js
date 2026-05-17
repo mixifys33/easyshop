@@ -247,7 +247,7 @@ router.get('/active', async (req, res) => {
         } else if (dtype === 'fixed') {
           discounted = Math.max(0, base - c.discountValue);
         }
-        const currency = p.currency || 'USD';
+        const currency = 'USD';
         return {
           id: p._id,
           title: p.appName,
