@@ -63,53 +63,208 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /active â€” public endpoint for the offers page (must be before /:id)
+const normalizeDiscountType = (discountType) => {
+  if (discountType === 'fixed_amount') return 'fixed';
+  return discountType;
+};
+
+const isCampaignCurrentlyActive = (campaign) => {
+  if (campaign.status === 'paused') return false;
+  const now = new Date();
+  return (
+    campaign.status === 'active' &&
+    new Date(campaign.startDate) <= now &&
+    new Date(campaign.endDate) >= now
+  );
+};
+
+const cartItemMatchesCampaign = (item, campaign) => {
+  const itemSeller = item.shopId || item.sellerId;
+  if (!itemSeller || String(itemSeller) !== String(campaign.sellerId)) return false;
+
+  if (campaign.appliesTo === 'all_products') return true;
+  if (campaign.appliesTo === 'specific_products') {
+    return (campaign.productIds || []).some((id) => String(id) === String(item.id));
+  }
+  if (campaign.appliesTo === 'specific_categories') {
+    return item.appCategory && (campaign.categories || []).includes(item.appCategory);
+  }
+  return false;
+};
+
+// POST /validate-coupon — used by marketplace cart/checkout
+router.post('/validate-coupon', async (req, res) => {
+  try {
+    const { code, cartItems = [], applicationId, total = 0 } = req.body;
+    const upperCode = String(code || '').trim().toUpperCase();
+
+    if (!upperCode) {
+      return res.status(400).json({ valid: false, message: 'Please enter a coupon code' });
+    }
+
+    const sellerIds = [
+      ...new Set(
+        cartItems.map((item) => item.shopId || item.sellerId).filter(Boolean)
+      ),
+    ];
+
+    if (!sellerIds.length) {
+      return res.status(400).json({ valid: false, message: 'No seller found for items in cart' });
+    }
+
+    const now = new Date();
+    let campaign = null;
+
+    for (const sellerId of sellerIds) {
+      const found = await Campaign.findOne({
+        sellerId,
+        couponCode: upperCode,
+        status: 'active',
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      }).lean();
+      if (found) {
+        campaign = found;
+        break;
+      }
+    }
+
+    if (!campaign) {
+      return res.json({ valid: false, message: 'Invalid or expired coupon code' });
+    }
+
+    if (campaign.maxUsage != null && campaign.usageCount >= campaign.maxUsage) {
+      return res.json({ valid: false, message: 'This coupon has reached its usage limit' });
+    }
+
+    let eligibleItems = cartItems.filter((item) => cartItemMatchesCampaign(item, campaign));
+
+    if (applicationId) {
+      eligibleItems = eligibleItems.filter((item) => String(item.id) === String(applicationId));
+      if (!eligibleItems.length) {
+        return res.json({
+          valid: false,
+          message: 'This coupon does not apply to this application',
+        });
+      }
+    }
+
+    if (!eligibleItems.length) {
+      return res.json({
+        valid: false,
+        message: 'This coupon does not apply to applications in your cart',
+      });
+    }
+
+    const baseAmount = applicationId
+      ? Number(eligibleItems[0]?.price) || 0
+      : eligibleItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+
+    if (campaign.minOrderAmount && baseAmount < campaign.minOrderAmount) {
+      return res.json({
+        valid: false,
+        message: `Minimum order of USD ${Number(campaign.minOrderAmount).toLocaleString()} required for this coupon`,
+      });
+    }
+
+    const discountType = normalizeDiscountType(campaign.discountType);
+    let discountAmount = 0;
+
+    if (discountType === 'percentage') {
+      discountAmount = Math.round(baseAmount * (campaign.discountValue / 100) * 100) / 100;
+    } else if (discountType === 'fixed') {
+      discountAmount = Math.min(campaign.discountValue, baseAmount);
+    }
+
+    const discountLabel =
+      discountType === 'percentage'
+        ? `${campaign.discountValue}% off`
+        : `USD ${Number(campaign.discountValue).toLocaleString()} off`;
+
+    return res.json({
+      valid: true,
+      type: discountType === 'percentage' ? 'percentage' : 'fixed',
+      value: campaign.discountValue,
+      discountAmount,
+      message: `${campaign.title} — ${discountLabel}`,
+      createdBy: 'seller',
+      campaignId: campaign._id,
+      sellerId: campaign.sellerId,
+      appliesTo: campaign.appliesTo,
+      affectedApplicationCount: eligibleItems.length,
+    });
+  } catch (err) {
+    console.error('[campaigns/validate-coupon]', err);
+    res.status(500).json({ valid: false, message: 'Failed to validate coupon' });
+  }
+});
+
+// GET /active — public endpoint for the offers page (must be before /:id)
 router.get('/active', async (req, res) => {
   try {
     const now = new Date();
-    const Product = require('../models/Product');
+    const Application = require('../models/Application');
     const Seller  = require('../models/Seller');
 
+    // Live campaigns: within date window, not paused/ended (includes active + draft in-range)
     const campaigns = await Campaign.find({
-      status: 'active',
       startDate: { $lte: now },
-      endDate:   { $gte: now },
+      endDate: { $gte: now },
+      status: { $nin: ['paused', 'ended'] },
     }).sort({ createdAt: -1 }).lean();
 
+    const appSelect =
+      'appName slug price currency screenshots appCategory adminRating _id sellerId isFree';
+
     const enriched = await Promise.all(campaigns.map(async (c) => {
-      let products = [];
+      let applications = [];
+      const appQuery = { isDraft: false, verificationStatus: 'verified', isActive: true };
+
       if (c.appliesTo === 'specific_products' && c.productIds?.length) {
-        products = await Product.find({ _id: { $in: c.productIds }, status: 'active', isDraft: { $ne: true } })
-          .select('title slug salePrice regularPrice images category brand stock ratings _id')
+        applications = await Application.find({ _id: { $in: c.productIds }, ...appQuery })
+          .select(appSelect)
           .lean();
       } else if (c.appliesTo === 'specific_categories' && c.categories?.length) {
-        products = await Product.find({ category: { $in: c.categories }, status: 'active', isDraft: { $ne: true } })
-          .select('title slug salePrice regularPrice images category brand stock ratings _id')
-          .limit(12).lean();
+        applications = await Application.find({
+          appCategory: { $in: c.categories },
+          sellerId: c.sellerId,
+          ...appQuery,
+        })
+          .select(appSelect)
+          .lean();
       } else {
-        products = await Product.find({ sellerId: c.sellerId, status: 'active', isDraft: { $ne: true } })
-          .select('title slug salePrice regularPrice images category brand stock ratings _id')
-          .limit(12).lean();
+        applications = await Application.find({ sellerId: c.sellerId, ...appQuery })
+          .select(appSelect)
+          .lean();
       }
 
-      const mappedProducts = products.map(p => {
-        const base = p.salePrice || p.regularPrice || 0;
+      const dtype = normalizeDiscountType(c.discountType);
+      const mappedProducts = applications.map((p) => {
+        const base = Number(p.price) || 0;
         let discounted = base;
-        if (c.discountType === 'percentage') discounted = Math.round(base * (1 - c.discountValue / 100));
-        else if (c.discountType === 'fixed')  discounted = Math.max(0, base - c.discountValue);
+        if (dtype === 'percentage') {
+          discounted = Math.round(base * (1 - c.discountValue / 100) * 100) / 100;
+        } else if (dtype === 'fixed') {
+          discounted = Math.max(0, base - c.discountValue);
+        }
+        const currency = p.currency || 'USD';
         return {
           id: p._id,
-          title: p.title,
-          slug: p.slug || p._id,
+          title: p.appName,
+          slug: p.slug || String(p._id),
           sale_price: base,
-          regular_price: p.regularPrice || base,
+          regular_price: base,
           discounted_price: discounted,
-          image: p.images?.[0]?.url || null,
-          category: p.category,
-          brand: p.brand,
-          stock: p.stock,
-          ratings: p.ratings || 0,
-          savings: base - discounted,
+          image: p.screenshots?.[0]?.url || null,
+          category: p.appCategory,
+          brand: null,
+          stock: 1,
+          ratings: p.adminRating || 0,
+          savings: Math.max(0, base - discounted),
+          currency,
+          sellerId: p.sellerId || c.sellerId,
+          isFree: p.isFree === true || base === 0,
+          couponCode: c.couponCode || null,
         };
       });
 
@@ -128,14 +283,18 @@ router.get('/active', async (req, res) => {
         startDate: c.startDate,
         endDate: c.endDate,
         appliesTo: c.appliesTo,
+        sellerId: c.sellerId,
         products: mappedProducts,
-        shopName: seller?.shop?.shopName || 'Global Investments',
+        shopName: seller?.shop?.shopName || 'Seller',
         shopAvatar: seller?.profileImage?.url || seller?.shop?.logo?.url || null,
         productCount: mappedProducts.length,
       };
     }));
 
-    res.json({ success: true, campaigns: enriched, total: enriched.length });
+    // Only return campaigns that have at least one application to show buyers
+    const withApps = enriched.filter((c) => c.products.length > 0);
+
+    res.json({ success: true, campaigns: withApps, total: withApps.length });
   } catch (err) {
     console.error('[campaigns/active]', err.message);
     res.status(500).json({ success: false, message: err.message });

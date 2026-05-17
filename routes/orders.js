@@ -33,7 +33,16 @@ const orderSchema = new mongoose.Schema({
   paymentStatus: { type: String, default: 'pending' },
   status: { type: String, default: 'pending' },
   subtotal: Number,
+  total: Number,
+  totalDiscount: Number,
   deliveryFee: Number,
+  appliedCoupons: [{
+    code: String,
+    discountAmount: Number,
+    campaignId: String,
+    scope: String,
+    applicationId: String,
+  }],
   customerInfo: {
     fullName: String,
     phone: String,
@@ -84,6 +93,20 @@ router.post('/', async (req, res) => {
     const order = new CustomerOrder(req.body);
     await order.save();
     console.log('[orders] Created order:', order._id, 'userId:', userId, 'seller:', sellerId, 'method:', paymentMethod);
+
+    if (Array.isArray(req.body.appliedCoupons) && req.body.appliedCoupons.length) {
+      const Campaign = require('../models/Campaign');
+      setImmediate(async () => {
+        for (const c of req.body.appliedCoupons) {
+          if (!c.campaignId) continue;
+          try {
+            await Campaign.findByIdAndUpdate(c.campaignId, { $inc: { usageCount: 1 } });
+          } catch (usageErr) {
+            console.error('[orders] Coupon usage increment failed:', usageErr.message);
+          }
+        }
+      });
+    }
 
     // Send emails in background — don't block the response
     setImmediate(async () => {

@@ -25,7 +25,8 @@ const campaignSchema = new mongoose.Schema({
     enum: ['all_products', 'specific_products', 'specific_categories'],
     default: 'all_products',
   },
-  productIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+  // Stores Application IDs (legacy field name kept for compatibility)
+  productIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Application' }],
   categories: [{ type: String }],
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
