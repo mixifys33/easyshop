@@ -95,11 +95,38 @@ const cartItemMatchesCampaign = (item, campaign) => {
 // POST /validate-coupon — used by marketplace cart/checkout
 router.post('/validate-coupon', async (req, res) => {
   try {
-    const { code, cartItems = [], applicationId, total = 0 } = req.body;
+    const { code, applicationId, total = 0 } = req.body;
+    let cartItems = Array.isArray(req.body.cartItems) ? req.body.cartItems : [];
     const upperCode = String(code || '').trim().toUpperCase();
 
     if (!upperCode) {
-      return res.status(400).json({ valid: false, message: 'Please enter a coupon code' });
+      return res.status(200).json({ valid: false, message: 'Please enter a coupon code' });
+    }
+
+    if (!cartItems.length) {
+      return res.status(200).json({ valid: false, message: 'Your cart is empty' });
+    }
+
+    const Application = require('../models/Application');
+    const needsSellerLookup = cartItems.some((item) => !(item.shopId || item.sellerId));
+
+    if (needsSellerLookup) {
+      const appIds = cartItems.map((item) => item.id).filter(Boolean);
+      const apps = await Application.find({ _id: { $in: appIds } })
+        .select('sellerId appCategory')
+        .lean();
+      const appById = new Map(apps.map((a) => [String(a._id), a]));
+
+      cartItems = cartItems.map((item) => {
+        const app = appById.get(String(item.id));
+        const sellerId = item.sellerId || item.shopId || app?.sellerId;
+        return {
+          ...item,
+          sellerId: sellerId ? String(sellerId) : undefined,
+          shopId: sellerId ? String(sellerId) : undefined,
+          appCategory: item.appCategory || app?.appCategory,
+        };
+      });
     }
 
     const sellerIds = [
@@ -109,7 +136,10 @@ router.post('/validate-coupon', async (req, res) => {
     ];
 
     if (!sellerIds.length) {
-      return res.status(400).json({ valid: false, message: 'No seller found for items in cart' });
+      return res.status(200).json({
+        valid: false,
+        message: 'Could not determine the seller for items in your cart. Remove and re-add the application, then try again.',
+      });
     }
 
     const now = new Date();
@@ -119,9 +149,9 @@ router.post('/validate-coupon', async (req, res) => {
       const found = await Campaign.findOne({
         sellerId,
         couponCode: upperCode,
-        status: 'active',
         startDate: { $lte: now },
         endDate: { $gte: now },
+        status: { $nin: ['paused', 'ended'] },
       }).lean();
       if (found) {
         campaign = found;
