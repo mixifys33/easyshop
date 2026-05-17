@@ -213,6 +213,181 @@ router.get('/drafts/seller/:sellerId', async (req, res) => {
   }
 });
 
+// GET /api/applications/seller/:sellerId/analytics - Seller analytics overview
+router.get('/seller/:sellerId/analytics', async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid seller ID',
+      });
+    }
+
+    const applications = await Application.find({
+      sellerId,
+      isDraft: false,
+    })
+      .select(
+        'appName appCategory verificationStatus price isFree currency views downloads rating reviewCount screenshots appIcon createdAt updatedAt publishedAt'
+      )
+      .sort({ downloads: -1, views: -1 });
+
+    const CustomerOrder = mongoose.models.CustomerOrder;
+    let orders = [];
+    if (CustomerOrder) {
+      orders = await CustomerOrder.find({ sellerId }).sort({ createdAt: -1 }).lean();
+    }
+
+    const revenueByApp = {};
+    const orderCountByApp = {};
+    let totalRevenue = 0;
+    let deliveredOrders = 0;
+
+    orders.forEach((order) => {
+      const orderTotal =
+        order.subtotal != null
+          ? order.subtotal + (order.deliveryFee || 0)
+          : (order.items || []).reduce(
+              (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
+              0
+            );
+
+      if (order.status === 'delivered') {
+        deliveredOrders += 1;
+        totalRevenue += orderTotal;
+      }
+
+      (order.items || []).forEach((item) => {
+        const appId = item.productId;
+        if (!appId) return;
+        orderCountByApp[appId] = (orderCountByApp[appId] || 0) + 1;
+        if (order.status === 'delivered') {
+          revenueByApp[appId] =
+            (revenueByApp[appId] || 0) + (item.price || 0) * (item.quantity || 1);
+        }
+      });
+    });
+
+    const totalViews = applications.reduce((s, a) => s + (a.views || 0), 0);
+    const totalDownloads = applications.reduce((s, a) => s + (a.downloads || 0), 0);
+    const totalReviews = applications.reduce((s, a) => s + (a.reviewCount || 0), 0);
+    const ratedApps = applications.filter((a) => (a.rating || 0) > 0);
+    const averageRating =
+      ratedApps.length > 0
+        ? ratedApps.reduce((s, a) => s + a.rating, 0) / ratedApps.length
+        : 0;
+
+    const conversionRate =
+      totalViews > 0 ? Number(((totalDownloads / totalViews) * 100).toFixed(1)) : 0;
+
+    const categoryMap = {};
+    applications.forEach((app) => {
+      const cat = app.appCategory || 'Uncategorized';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { category: cat, count: 0, views: 0, downloads: 0 };
+      }
+      categoryMap[cat].count += 1;
+      categoryMap[cat].views += app.views || 0;
+      categoryMap[cat].downloads += app.downloads || 0;
+    });
+
+    const appAnalytics = applications.map((app) => {
+      const views = app.views || 0;
+      const downloads = app.downloads || 0;
+      return {
+        _id: app._id,
+        appName: app.appName,
+        appCategory: app.appCategory,
+        verificationStatus: app.verificationStatus,
+        price: app.price,
+        isFree: app.isFree,
+        currency: app.currency,
+        views,
+        downloads,
+        rating: app.rating || 0,
+        reviewCount: app.reviewCount || 0,
+        conversionRate: views > 0 ? Number(((downloads / views) * 100).toFixed(1)) : 0,
+        orderCount: orderCountByApp[String(app._id)] || 0,
+        revenue: revenueByApp[String(app._id)] || 0,
+        screenshots: app.screenshots,
+        appIcon: app.appIcon,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        publishedAt: app.publishedAt,
+      };
+    });
+
+    const today = new Date();
+    const revenueByDay = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayRevenue = orders
+        .filter((o) => {
+          if (o.status !== 'delivered') return false;
+          const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
+          return orderDate === dateStr;
+        })
+        .reduce((sum, o) => {
+          const orderTotal =
+            o.subtotal != null
+              ? o.subtotal + (o.deliveryFee || 0)
+              : (o.items || []).reduce(
+                  (s, item) => s + (item.price || 0) * (item.quantity || 1),
+                  0
+                );
+          return sum + orderTotal;
+        }, 0);
+      revenueByDay.push({
+        date: `${date.getMonth() + 1}/${date.getDate()}`,
+        revenue: dayRevenue,
+        orders: orders.filter((o) => {
+          const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
+          return orderDate === dateStr;
+        }).length,
+      });
+    }
+
+    const verifiedCount = applications.filter(
+      (a) => a.verificationStatus === 'verified'
+    ).length;
+
+    res.json({
+      success: true,
+      summary: {
+        totalApplications: applications.length,
+        verifiedApplications: verifiedCount,
+        pendingApplications: applications.filter((a) => a.verificationStatus === 'pending').length,
+        rejectedApplications: applications.filter((a) => a.verificationStatus === 'rejected').length,
+        totalViews,
+        totalDownloads,
+        totalReviews,
+        averageRating: Number(averageRating.toFixed(1)),
+        conversionRate,
+        totalRevenue,
+        totalOrders: orders.length,
+        deliveredOrders,
+        pendingOrders: orders.filter((o) => o.status === 'pending').length,
+      },
+      applications: appAnalytics,
+      categoryBreakdown: Object.values(categoryMap),
+      topByDownloads: [...appAnalytics].sort((a, b) => b.downloads - a.downloads).slice(0, 5),
+      topByViews: [...appAnalytics].sort((a, b) => b.views - a.views).slice(0, 5),
+      revenueByDay,
+    });
+  } catch (error) {
+    console.error('Error fetching seller analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch seller analytics',
+      error: error.message,
+    });
+  }
+});
+
 // GET /api/applications/:id - Get single application
 router.get('/:id', async (req, res) => {
   try {
