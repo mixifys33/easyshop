@@ -924,6 +924,31 @@ const upload = multer({
   },
 });
 
+const normalizeBulkHeader = (header) =>
+  String(header || '')
+    .trim()
+    .replace(/\s*\*\s*$/, '')
+    .trim();
+
+const bulkHeaderToKey = (header) => {
+  const norm = normalizeBulkHeader(header).toLowerCase();
+  const match = TEMPLATE_COLUMNS.find(
+    (col) =>
+      col.header.toLowerCase() === norm ||
+      col.key.toLowerCase() === norm.replace(/\s+/g, '')
+  );
+  return match ? match.key : null;
+};
+
+const mapBulkRowToApplication = (row) => {
+  const mapped = {};
+  Object.entries(row).forEach(([header, value]) => {
+    const key = bulkHeaderToKey(header);
+    if (key) mapped[key] = value;
+  });
+  return mapped;
+};
+
 // Application template columns
 const TEMPLATE_COLUMNS = [
   { header: 'Application Name', key: 'appName', width: 30 },
@@ -1040,7 +1065,7 @@ router.get('/bulk-upload/template/:type', async (req, res) => {
       'Web Application', 'Mobile App (React Native)', 'Mobile App (Native iOS)',
       'Mobile App (Native Android)', 'Desktop Application', 'API/Backend Service',
       'Chrome Extension', 'WordPress Plugin', 'NPM Package/Library',
-      'CLI Tool', 'Game', 'E-commerce Solution', 'CMS/Blog Platform',
+      'CLI Tool', 'Game', 'E-commerce Platform', 'CMS/Blog Platform',
       'Dashboard/Admin Panel', 'Other'
     ].forEach(cat => infoSheet.addRow([`  • ${cat}`]));
     infoSheet.addRow(['']);
@@ -1084,13 +1109,20 @@ router.post('/bulk-upload/parse', upload.single('file'), async (req, res) => {
         return res.status(400).json({ success: false, message: 'CSV file is empty or has no data rows' });
       }
       const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-      const data = lines.slice(1).map(line => {
+      const rawRows = lines.slice(1).map(line => {
         const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
         const row = {};
         headers.forEach((h, i) => { row[h] = values[i] || ''; });
         return row;
       });
-      return res.json({ success: true, headers, data, totalRows: data.length });
+      const data = rawRows.map(mapBulkRowToApplication).filter((r) => r.appName?.trim());
+      return res.json({
+        success: true,
+        headers,
+        data,
+        rawRows,
+        totalRows: data.length,
+      });
     }
 
     // Parse Excel
@@ -1101,35 +1133,43 @@ router.post('/bulk-upload/parse', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'No worksheet found in file' });
     }
 
-    const headers = [];
-    const data = [];
+    const fileHeaders = [];
+    const rawRows = [];
 
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) {
         row.eachCell((cell) => {
           const val = cell.value?.toString().trim() || '';
-          headers.push(val);
+          fileHeaders.push(val);
         });
       } else {
         const rowData = {};
         let hasData = false;
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const header = headers[colNumber - 1];
+          const header = fileHeaders[colNumber - 1];
           if (header) {
             const val = cell.value !== null && cell.value !== undefined ? cell.value.toString().trim() : '';
             rowData[header] = val;
             if (val) hasData = true;
           }
         });
-        if (hasData) data.push(rowData);
+        if (hasData) rawRows.push(rowData);
       }
     });
 
-    if (headers.length === 0) {
+    if (fileHeaders.length === 0) {
       return res.status(400).json({ success: false, message: 'No headers found in file' });
     }
 
-    res.json({ success: true, headers, data, totalRows: data.length });
+    const data = rawRows.map(mapBulkRowToApplication).filter((r) => r.appName?.trim());
+
+    res.json({
+      success: true,
+      headers: fileHeaders,
+      data,
+      rawRows,
+      totalRows: data.length,
+    });
   } catch (error) {
     console.error('File parse error:', error);
     res.status(500).json({ success: false, message: 'Failed to parse file', error: error.message });
