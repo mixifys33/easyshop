@@ -142,7 +142,7 @@ const filterApplicationData = (application, isLoggedIn, userPurchasedApps = []) 
     rating: application.rating,
     downloads: application.downloads,
     badges: application.badges,
-    verification Status: application.verificationStatus,
+    verificationStatus: application.verificationStatus,
     sellerId: application.sellerId,
     // Don't include: detailedDescription, dependencies, technicalRequirements, sourceCodeFile
   };
