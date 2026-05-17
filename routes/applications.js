@@ -225,6 +225,20 @@ const applicationRevenue = (app) => {
   return (Number(app.price) || 0) * (app.downloads || 0);
 };
 
+const getAdminRating = (app) => Number(app.adminRating) || 0;
+
+const computeAdminRatingStats = (applications) => {
+  const ratedApps = applications.filter((a) => getAdminRating(a) > 0);
+  const averageAdminRating =
+    ratedApps.length > 0
+      ? ratedApps.reduce((s, a) => s + getAdminRating(a), 0) / ratedApps.length
+      : 0;
+  return {
+    averageAdminRating: Number(averageAdminRating.toFixed(1)),
+    ratedByAdminCount: ratedApps.length,
+  };
+};
+
 // GET /api/applications/seller/:sellerId/analytics - Seller analytics overview
 router.get('/seller/:sellerId/analytics', async (req, res) => {
   try {
@@ -242,7 +256,7 @@ router.get('/seller/:sellerId/analytics', async (req, res) => {
       isDraft: false,
     })
       .select(
-        'appName appCategory verificationStatus price isFree currency views downloads rating reviewCount screenshots appIcon createdAt updatedAt publishedAt'
+        'appName appCategory verificationStatus price isFree currency views downloads adminRating completionScore screenshots appIcon createdAt updatedAt publishedAt'
       )
       .sort({ downloads: -1, views: -1 });
 
@@ -251,12 +265,7 @@ router.get('/seller/:sellerId/analytics', async (req, res) => {
     const paidApplications = applications.filter(isPaidApplication);
     const paidDownloads = paidApplications.reduce((s, a) => s + (a.downloads || 0), 0);
     const totalRevenue = paidApplications.reduce((s, a) => s + applicationRevenue(a), 0);
-    const totalReviews = applications.reduce((s, a) => s + (a.reviewCount || 0), 0);
-    const ratedApps = applications.filter((a) => (a.rating || 0) > 0);
-    const averageRating =
-      ratedApps.length > 0
-        ? ratedApps.reduce((s, a) => s + a.rating, 0) / ratedApps.length
-        : 0;
+    const adminRatingStats = computeAdminRatingStats(applications);
 
     const conversionRate =
       totalViews > 0 ? Number(((totalDownloads / totalViews) * 100).toFixed(1)) : 0;
@@ -288,8 +297,8 @@ router.get('/seller/:sellerId/analytics', async (req, res) => {
         currency: app.currency || 'USD',
         views,
         downloads,
-        rating: app.rating || 0,
-        reviewCount: app.reviewCount || 0,
+        adminRating: getAdminRating(app),
+        completionScore: app.completionScore || 0,
         conversionRate: views > 0 ? Number(((downloads / views) * 100).toFixed(1)) : 0,
         revenue: applicationRevenue(app),
         screenshots: app.screenshots,
@@ -316,8 +325,8 @@ router.get('/seller/:sellerId/analytics', async (req, res) => {
         totalViews,
         totalDownloads,
         paidDownloads,
-        totalReviews,
-        averageRating: Number(averageRating.toFixed(1)),
+        averageAdminRating: adminRatingStats.averageAdminRating,
+        ratedByAdminCount: adminRatingStats.ratedByAdminCount,
         conversionRate,
         totalRevenue: Number(totalRevenue.toFixed(2)),
       },
