@@ -2,6 +2,12 @@
 const router = express.Router();
 const Campaign = require('../models/Campaign');
 
+// Helper: normalize discountType — seller form sends 'fixed_amount', model expects 'fixed'
+const normalizeDiscountType = (discountType) => {
+  if (discountType === 'fixed_amount') return 'fixed';
+  return discountType;
+};
+
 // Helper: compute correct status from dates
 const computeStatus = (c) => {
   if (c.status === 'paused') return 'paused';
@@ -51,7 +57,9 @@ router.post('/', async (req, res) => {
     }
 
     const campaign = new Campaign({
-      sellerId, title, description, type, discountType, discountValue,
+      sellerId, title, description, type,
+      discountType: normalizeDiscountType(discountType),
+      discountValue,
       minOrderAmount, maxUsage, couponCode, appliesTo, productIds,
       categories, startDate, endDate, bannerColor,
     });
@@ -63,11 +71,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-const normalizeDiscountType = (discountType) => {
-  if (discountType === 'fixed_amount') return 'fixed';
-  return discountType;
-};
-
 const isCampaignCurrentlyActive = (campaign) => {
   if (campaign.status === 'paused') return false;
   const now = new Date();
@@ -78,9 +81,19 @@ const isCampaignCurrentlyActive = (campaign) => {
   );
 };
 
+const normalizeSellerId = (val) => {
+  if (val == null || val === '') return undefined;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') {
+    if (val._id) return String(val._id);
+    if (val.id) return String(val.id);
+  }
+  return String(val);
+};
+
 const cartItemMatchesCampaign = (item, campaign) => {
-  const itemSeller = item.shopId || item.sellerId;
-  if (!itemSeller || String(itemSeller) !== String(campaign.sellerId)) return false;
+  const itemSeller = normalizeSellerId(item.shopId || item.sellerId);
+  if (!itemSeller || itemSeller !== String(campaign.sellerId)) return false;
 
   if (campaign.appliesTo === 'all_products') return true;
   if (campaign.appliesTo === 'specific_products') {
@@ -108,10 +121,25 @@ router.post('/validate-coupon', async (req, res) => {
     }
 
     const Application = require('../models/Application');
-    const needsSellerLookup = cartItems.some((item) => !(item.shopId || item.sellerId));
+    const mongoose = require('mongoose');
+
+    cartItems = cartItems.map((item) => {
+      const sellerId = normalizeSellerId(item.sellerId || item.shopId);
+      return {
+        ...item,
+        id: item.id || item.productId,
+        sellerId,
+        shopId: sellerId,
+      };
+    });
+
+    const needsSellerLookup = cartItems.some((item) => !item.sellerId && item.id);
 
     if (needsSellerLookup) {
-      const appIds = cartItems.map((item) => item.id).filter(Boolean);
+      const appIds = cartItems
+        .map((item) => item.id)
+        .filter((id) => id && mongoose.Types.ObjectId.isValid(String(id)));
+
       const apps = await Application.find({ _id: { $in: appIds } })
         .select('sellerId appCategory')
         .lean();
@@ -119,11 +147,13 @@ router.post('/validate-coupon', async (req, res) => {
 
       cartItems = cartItems.map((item) => {
         const app = appById.get(String(item.id));
-        const sellerId = item.sellerId || item.shopId || app?.sellerId;
+        const sellerId =
+          normalizeSellerId(item.sellerId || item.shopId) ||
+          normalizeSellerId(app?.sellerId);
         return {
           ...item,
-          sellerId: sellerId ? String(sellerId) : undefined,
-          shopId: sellerId ? String(sellerId) : undefined,
+          sellerId,
+          shopId: sellerId,
           appCategory: item.appCategory || app?.appCategory,
         };
       });
@@ -131,7 +161,7 @@ router.post('/validate-coupon', async (req, res) => {
 
     const sellerIds = [
       ...new Set(
-        cartItems.map((item) => item.shopId || item.sellerId).filter(Boolean)
+        cartItems.map((item) => normalizeSellerId(item.shopId || item.sellerId)).filter(Boolean)
       ),
     ];
 
@@ -292,7 +322,9 @@ router.get('/active', async (req, res) => {
           ratings: p.adminRating || 0,
           savings: Math.max(0, base - discounted),
           currency,
-          sellerId: p.sellerId || c.sellerId,
+          // Always stringify so cart items carry a plain string, not a MongoDB ObjectId
+          sellerId: String(p.sellerId || c.sellerId || ''),
+          shopId: String(p.sellerId || c.sellerId || ''),
           isFree: p.isFree === true || base === 0,
           couponCode: c.couponCode || null,
         };
@@ -313,7 +345,7 @@ router.get('/active', async (req, res) => {
         startDate: c.startDate,
         endDate: c.endDate,
         appliesTo: c.appliesTo,
-        sellerId: c.sellerId,
+        sellerId: String(c.sellerId || ''),
         products: mappedProducts,
         shopName: seller?.shop?.shopName || 'Seller',
         shopAvatar: seller?.profileImage?.url || seller?.shop?.logo?.url || null,
@@ -347,12 +379,16 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const allowed = [
-      'title', 'description', 'type', 'discountType', 'discountValue',
+      'title', 'description', 'type', 'discountValue',
       'minOrderAmount', 'maxUsage', 'couponCode', 'appliesTo', 'productIds',
       'categories', 'startDate', 'endDate', 'bannerColor', 'status',
     ];
     const update = {};
     allowed.forEach(f => { if (req.body[f] !== undefined) update[f] = req.body[f]; });
+    // Normalize discountType separately so 'fixed_amount' → 'fixed'
+    if (req.body.discountType !== undefined) {
+      update.discountType = normalizeDiscountType(req.body.discountType);
+    }
 
     const campaign = await Campaign.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true });
     if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
