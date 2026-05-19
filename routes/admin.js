@@ -7,6 +7,9 @@
  * PATCH /api/admin/sellers/:id/approve â€” approve a seller
  * PATCH /api/admin/sellers/:id/reject  â€” reject a seller
  * PATCH /api/admin/sellers/:id/suspend â€” suspend a seller
+ * PATCH /api/admin/sellers/:id/ban    â€” ban a seller
+ * PATCH /api/admin/sellers/:id/unban  â€” unban a seller
+ * DELETE /api/admin/sellers/:id       â€” delete a seller
  * GET  /api/admin/users          â€” all customers
  * GET  /api/admin/orders         â€” all orders
  * GET  /api/admin/products       â€” all products
@@ -20,6 +23,7 @@ const Seller = require('../models/Seller');
 const User = require('../models/User');
 const PushToken = require('../models/PushToken');
 const { Expo } = require('expo-server-sdk');
+const { permanentlyDeleteSeller } = require('../services/sellerDeletionService');
 
 const expo = new Expo();
 
@@ -294,6 +298,76 @@ router.patch('/sellers/:id/unsuspend', adminAuth, async (req, res) => {
   } catch (err) {
     console.error('[Admin] Unsuspend seller error:', err);
     res.status(500).json({ error: 'Failed to unsuspend seller' });
+  }
+});
+
+// PATCH /api/admin/sellers/:id/ban
+router.patch('/sellers/:id/ban', adminAuth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      { status: 'banned', banReason: reason || 'Banned by admin' },
+      { new: true }
+    ).select('-password');
+
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+
+    const tokenDoc = await PushToken.findOne({ userId: seller._id, userType: 'seller' });
+    if (tokenDoc?.token && Expo.isExpoPushToken(tokenDoc.token)) {
+      await expo.sendPushNotificationsAsync([{
+        to: tokenDoc.token,
+        sound: 'default',
+        title: 'Account Banned',
+        body: `Your seller account has been banned. ${reason ? `Reason: ${reason}` : 'Contact support for details.'}`,
+        data: { type: 'seller_banned' },
+      }]);
+    }
+
+    res.json({ success: true, message: 'Seller banned', seller });
+  } catch (err) {
+    console.error('[Admin] Ban seller error:', err);
+    res.status(500).json({ error: 'Failed to ban seller' });
+  }
+});
+
+// PATCH /api/admin/sellers/:id/unban
+router.patch('/sellers/:id/unban', adminAuth, async (req, res) => {
+  try {
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      { status: 'active', $unset: { banReason: '' } },
+      { new: true }
+    ).select('-password');
+
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+
+    res.json({ success: true, message: 'Seller unbanned', seller });
+  } catch (err) {
+    console.error('[Admin] Unban seller error:', err);
+    res.status(500).json({ error: 'Failed to unban seller' });
+  }
+});
+
+// DELETE /api/admin/sellers/:id — full cascade (DB + ImageKit + orders)
+router.delete('/sellers/:id', adminAuth, async (req, res) => {
+  try {
+    const result = await permanentlyDeleteSeller(req.params.id);
+    if (!result.found) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+
+    console.log('[Admin] Seller permanently deleted:', req.params.id, result.counts);
+
+    res.json({
+      success: true,
+      message: 'Seller and all related data deleted permanently',
+      deleted: result.counts,
+      imageDeletionErrors: result.imageDeletionErrors,
+    });
+  } catch (err) {
+    console.error('[Admin] Delete seller error:', err);
+    res.status(500).json({ error: 'Failed to delete seller' });
   }
 });
 
