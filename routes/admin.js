@@ -575,7 +575,7 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
       newUsersLast7,
       bannedUsers,
       totalOrders,
-      paidOrders,
+      paidOrdersCount,
       cancelledOrders,
       totalRevenue,
       userGrowth,
@@ -586,10 +586,18 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
       User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
       User.countDocuments({ isBanned: true }),
       CustomerOrder.countDocuments({}),
-      CustomerOrder.countDocuments({ paymentStatus: { $in: ['paid', 'submitted'] } }),
+      // Count only orders with total > 0 as "paid orders" (exclude free downloads)
+      CustomerOrder.countDocuments({ 
+        paymentStatus: { $in: ['paid', 'submitted'] },
+        total: { $gt: 0 }
+      }),
       CustomerOrder.countDocuments({ status: 'cancelled' }),
+      // Sum revenue only from orders with total > 0
       CustomerOrder.aggregate([
-        { $match: { paymentStatus: { $in: ['paid', 'submitted'] } } },
+        { $match: { 
+          paymentStatus: { $in: ['paid', 'submitted'] },
+          total: { $gt: 0 }
+        }},
         { $group: { _id: null, total: { $sum: '$total' } } },
       ]),
       // User registrations per day for last 30 days
@@ -601,10 +609,17 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
         }},
         { $sort: { _id: 1 } },
       ]),
-      // Top buyers by order count
+      // Top buyers by order count (only count paid orders with total > 0)
       CustomerOrder.aggregate([
-        { $match: { paymentStatus: { $in: ['paid', 'submitted'] } } },
-        { $group: { _id: '$userId', orderCount: { $sum: 1 }, totalSpent: { $sum: '$total' } } },
+        { $match: { 
+          paymentStatus: { $in: ['paid', 'submitted'] },
+          total: { $gt: 0 }
+        }},
+        { $group: {
+          _id: '$userId',
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$total' },
+        }},
         { $sort: { totalSpent: -1 } },
         { $limit: 10 },
       ]),
@@ -618,9 +633,13 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
     ]);
     const uniqueBuyers = uniqueBuyerAgg[0]?.total || 0;
 
-    // Count unique paid buyers
+    // Count unique paid buyers — only users with total > 0 and paid/submitted status
     const uniquePaidBuyerAgg = await CustomerOrder.aggregate([
-      { $match: { paymentStatus: { $in: ['paid', 'submitted'] }, userId: { $exists: true, $ne: null, $ne: '' } } },
+      { $match: {
+        paymentStatus: { $in: ['paid', 'submitted'] },
+        total: { $gt: 0 },
+        userId: { $exists: true, $ne: null, $ne: '' },
+      }},
       { $group: { _id: '$userId' } },
       { $count: 'total' },
     ]);
@@ -637,9 +656,10 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
     }));
 
     const totalRev = totalRevenue[0]?.total || 0;
-    // conversionRate = unique buyers who paid / total users (meaningful conversion)
+    // conversionRate = unique buyers who paid > $0 / total users (meaningful conversion)
     const conversionRate = totalUsers > 0 ? Number(((uniquePaidBuyers / totalUsers) * 100).toFixed(1)) : 0;
-    const buyRate = totalOrders > 0 ? Number(((paidOrders / totalOrders) * 100).toFixed(1)) : 0;
+    // buyRate = paid orders with total > $0 / total orders (exclude free downloads)
+    const buyRate = totalOrders > 0 ? Number(((paidOrdersCount / totalOrders) * 100).toFixed(1)) : 0;
 
     res.json({
       success: true,
@@ -649,7 +669,7 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
         newUsersLast7,
         bannedUsers,
         totalOrders,
-        paidOrders,
+        paidOrders: paidOrdersCount,
         cancelledOrders,
         uniqueBuyers,       // distinct users who placed any order
         uniquePaidBuyers,   // distinct users who paid
