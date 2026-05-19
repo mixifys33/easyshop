@@ -610,6 +610,22 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
       ]),
     ]);
 
+    // Count unique buyers (distinct userIds who placed any order)
+    const uniqueBuyerAgg = await CustomerOrder.aggregate([
+      { $match: { userId: { $exists: true, $ne: null, $ne: '' } } },
+      { $group: { _id: '$userId' } },
+      { $count: 'total' },
+    ]);
+    const uniqueBuyers = uniqueBuyerAgg[0]?.total || 0;
+
+    // Count unique paid buyers
+    const uniquePaidBuyerAgg = await CustomerOrder.aggregate([
+      { $match: { paymentStatus: { $in: ['paid', 'submitted'] }, userId: { $exists: true, $ne: null, $ne: '' } } },
+      { $group: { _id: '$userId' } },
+      { $count: 'total' },
+    ]);
+    const uniquePaidBuyers = uniquePaidBuyerAgg[0]?.total || 0;
+
     // Enrich top buyers with user info
     const buyerIds = topBuyers.map(b => b._id).filter(Boolean);
     const buyerUsers = await User.find({ _id: { $in: buyerIds } }).select('name email').lean();
@@ -621,7 +637,8 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
     }));
 
     const totalRev = totalRevenue[0]?.total || 0;
-    const conversionRate = totalUsers > 0 ? Number(((paidOrders / totalUsers) * 100).toFixed(1)) : 0;
+    // conversionRate = unique buyers who paid / total users (meaningful conversion)
+    const conversionRate = totalUsers > 0 ? Number(((uniquePaidBuyers / totalUsers) * 100).toFixed(1)) : 0;
     const buyRate = totalOrders > 0 ? Number(((paidOrders / totalOrders) * 100).toFixed(1)) : 0;
 
     res.json({
@@ -634,6 +651,8 @@ router.get('/analytics/users', adminAuth, async (req, res) => {
         totalOrders,
         paidOrders,
         cancelledOrders,
+        uniqueBuyers,       // distinct users who placed any order
+        uniquePaidBuyers,   // distinct users who paid
         totalRevenue: Number(totalRev.toFixed(2)),
         conversionRate,
         buyRate,
