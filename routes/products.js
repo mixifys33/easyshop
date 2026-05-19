@@ -315,6 +315,10 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const { enforceSellerCanOperate } = require('../utils/sellerAccess');
+    const activeSeller = await enforceSellerCanOperate(productData.sellerId, res);
+    if (!activeSeller) return;
+
     // Validate required fields
     const requiredFields = ['title', 'description', 'category', 'subCategory', 'regularPrice', 'salePrice', 'stock'];
     const missingFields = requiredFields.filter(field => !productData[field]);
@@ -815,12 +819,10 @@ const authenticateSeller = async (req, res, next) => {
       });
     }
 
-    if (!seller.verified || seller.status !== 'active') {
-      return res.status(401).json({
-        success: false,
-        message: 'Seller account not active',
-        error: 'Please verify your seller account'
-      });
+    const { getSellerOperationDenial } = require('../utils/sellerAccess');
+    const denial = getSellerOperationDenial(seller);
+    if (denial) {
+      return res.status(denial.statusCode).json(denial.body);
     }
 
     req.seller = seller;

@@ -2,6 +2,12 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const Seller = require('../models/Seller');
 const { generateOTP, sendOTPEmail, sendWelcomeEmail } = require('../services/emailService');
+const {
+  getSellerLoginDenial,
+  getSellerOperationDenial,
+  enforceSellerCanOperate,
+  sellerStatusPayload,
+} = require('../utils/sellerAccess');
 const router = express.Router();
 
 // In-memory storage for OTPs and temporary data (in production, use Redis or database)
@@ -536,6 +542,35 @@ router.get('/debug/list-sellers', async (req, res) => {
   }
 });
 
+// GET /api/sellers/account-status/:sellerId — used by dashboard to revoke banned sessions
+router.get('/account-status/:sellerId', async (req, res) => {
+  try {
+    const seller = await Seller.findById(req.params.sellerId).select(
+      'status approvalStatus approvalRejectionReason suspensionReason banReason verified'
+    );
+    if (!seller) {
+      return res.status(404).json({ success: false, error: 'Seller not found' });
+    }
+
+    const denial = getSellerOperationDenial(seller);
+    if (denial) {
+      return res.status(200).json({
+        success: true,
+        allowed: false,
+        ...denial.body,
+      });
+    }
+
+    res.json({
+      success: true,
+      allowed: true,
+      ...sellerStatusPayload(seller),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to check account status' });
+  }
+});
+
 // Seller login endpoint
 router.post('/login', async (req, res) => {
   try {
@@ -564,15 +599,7 @@ router.post('/login', async (req, res) => {
     
     console.log(`✅ Seller found: ${seller.name}, Verified: ${seller.verified}`);
     
-    if (!seller.verified) {
-      console.log(`❌ Account not verified for: ${email}`);
-      return res.status(401).json({
-        message: 'Account not verified',
-        error: 'Please verify your email address first'
-      });
-    }
-
-    // Verify password using the model method
+    // Verify password before revealing account status
     const isPasswordValid = await seller.comparePassword(password);
     
     if (!isPasswordValid) {
@@ -580,6 +607,20 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         message: 'Invalid credentials',
         error: 'Email or password is incorrect'
+      });
+    }
+
+    const loginDenial = getSellerLoginDenial(seller);
+    if (loginDenial) {
+      console.log(`❌ Login blocked for ${email}:`, loginDenial.body.code);
+      return res.status(loginDenial.statusCode).json(loginDenial.body);
+    }
+
+    if (!seller.verified) {
+      console.log(`❌ Account not verified for: ${email}`);
+      return res.status(401).json({
+        message: 'Account not verified',
+        error: 'Please verify your email address first'
       });
     }
     
@@ -593,7 +634,10 @@ router.post('/login', async (req, res) => {
         name: seller.name,
         email: seller.email,
         phoneNumber: seller.phoneNumber,
-        shop: seller.shop
+        shop: seller.shop,
+        status: seller.status,
+        approvalStatus: seller.approvalStatus,
+        verified: seller.verified,
       }
     });
     
@@ -1102,6 +1146,8 @@ router.get('/profile/:sellerId', async (req, res) => {
 router.put('/profile/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     const { name, email, phoneNumber } = req.body;
     
     // Validate required fields
@@ -1217,6 +1263,8 @@ router.put('/profile/:sellerId', async (req, res) => {
 router.put('/change-password/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     const { currentPassword, newPassword } = req.body;
     
     // Validate required fields
@@ -1317,6 +1365,8 @@ router.put('/change-password/:sellerId', async (req, res) => {
 router.put('/profile-image/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     const { profileImage } = req.body;
     
     // Validate required fields
@@ -1369,6 +1419,8 @@ router.put('/profile-image/:sellerId', async (req, res) => {
 router.delete('/profile-image/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     
     // Find seller
     const seller = await Seller.findById(sellerId);
@@ -1423,6 +1475,9 @@ router.post('/shop-setup', async (req, res) => {
         error: 'Missing seller identification'
       });
     }
+
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     
     // Validate required shop fields
     if (!shopName || !shopDescription || !businessType || !businessAddress || !city) {
@@ -1817,6 +1872,8 @@ router.get('/payment/:sellerId', async (req, res) => {
 // ── UPDATE seller payment settings + sync to all products ─────────────────
 router.put('/payment/:sellerId', async (req, res) => {
   try {
+    const activeSeller = await enforceSellerCanOperate(req.params.sellerId, res);
+    if (!activeSeller) return;
     const { mtnName, mtnNumber, airtelName, airtelNumber, bankName, bankAccountName, bankAccountNumber, bankBranch, preferredMethod } = req.body;
 
     const update = {};
@@ -2136,6 +2193,8 @@ router.get('/distribution/:sellerId', async (req, res) => {
 // ── PUT /api/sellers/distribution/:sellerId — save distribution settings ─────
 router.put('/distribution/:sellerId', async (req, res) => {
   try {
+    const activeSeller = await enforceSellerCanOperate(req.params.sellerId, res);
+    if (!activeSeller) return;
     const { distribution } = req.body;
     if (!distribution) return res.status(400).json({ success: false, message: 'Distribution settings required' });
 

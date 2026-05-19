@@ -48,6 +48,10 @@ router.post('/', async (req, res) => {
     if (!sellerId || !title || !type || !startDate || !endDate) {
       return res.status(400).json({ success: false, message: 'sellerId, title, type, startDate, endDate are required' });
     }
+
+    const { enforceSellerCanOperate } = require('../utils/sellerAccess');
+    const activeSeller = await enforceSellerCanOperate(sellerId, res);
+    if (!activeSeller) return;
     if (new Date(endDate) <= new Date(startDate)) {
       return res.status(400).json({ success: false, message: 'End date must be after start date' });
     }

@@ -3,6 +3,7 @@ const router = express.Router();
 const Application = require('../models/Application');
 const Seller = require('../models/Seller');
 const mongoose = require('mongoose');
+const { enforceSellerCanOperate } = require('../utils/sellerAccess');
 
 // Helper function to validate URL
 const isValidUrl = (string) => {
@@ -405,14 +406,8 @@ router.post('/', async (req, res) => {
     console.log('sourceCodeFile.fileId:', applicationData.sourceCodeFile?.fileId);
     console.log('====================================');
     
-    // Validate seller exists
-    const seller = await Seller.findById(applicationData.sellerId);
-    if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found'
-      });
-    }
+    const seller = await enforceSellerCanOperate(applicationData.sellerId, res);
+    if (!seller) return;
     
     // Validate application data
     const validationErrors = validateApplicationData(applicationData, false);
@@ -475,14 +470,8 @@ router.post('/draft', async (req, res) => {
   try {
     const draftData = req.body;
     
-    // Validate seller exists
-    const seller = await Seller.findById(draftData.sellerId);
-    if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: 'Seller not found'
-      });
-    }
+    const seller = await enforceSellerCanOperate(draftData.sellerId, res);
+    if (!seller) return;
     
     // Validate draft data (minimal validation)
     const validationErrors = validateApplicationData(draftData, true);
@@ -572,6 +561,9 @@ router.put('/:id', async (req, res) => {
         message: 'Application not found'
       });
     }
+
+    const seller = await enforceSellerCanOperate(application.sellerId, res);
+    if (!seller) return;
     
     // Validate update data
     const validationErrors = validateApplicationData(updateData, application.isDraft);
@@ -645,6 +637,9 @@ router.delete('/:id', async (req, res) => {
         message: 'Application not found'
       });
     }
+
+    const seller = await enforceSellerCanOperate(application.sellerId, res);
+    if (!seller) return;
     
     // Initialize ImageKit for deleting files
     let imagekit = null;
@@ -1189,11 +1184,8 @@ router.post('/bulk-upload/process', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid seller ID is required' });
     }
 
-    // Verify seller exists
-    const seller = await Seller.findById(sellerId);
-    if (!seller) {
-      return res.status(404).json({ success: false, message: 'Seller not found' });
-    }
+    const seller = await enforceSellerCanOperate(sellerId, res);
+    if (!seller) return;
 
     let successCount = 0;
     let failedCount = 0;
