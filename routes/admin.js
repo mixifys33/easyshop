@@ -555,4 +555,331 @@ router.patch('/applications/:id/boost', adminAuth, async (req, res) => {
   }
 });
 
+// ── ANALYTICS ROUTES ─────────────────────────────────────────────────────────
+
+// GET /api/admin/analytics/users — user analytics
+router.get('/analytics/users', adminAuth, async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    // Use CustomerOrder (the real order model used by the app)
+    const CustomerOrder = mongoose.models.CustomerOrder ||
+      mongoose.model('CustomerOrder', new mongoose.Schema({}, { strict: false }), 'customerorders');
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo  = new Date(now - 7  * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      newUsersLast30,
+      newUsersLast7,
+      bannedUsers,
+      totalOrders,
+      paidOrders,
+      cancelledOrders,
+      totalRevenue,
+      userGrowth,
+      topBuyers,
+    ] = await Promise.all([
+      User.countDocuments({}),
+      User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      User.countDocuments({ isBanned: true }),
+      CustomerOrder.countDocuments({}),
+      CustomerOrder.countDocuments({ paymentStatus: { $in: ['paid', 'submitted'] } }),
+      CustomerOrder.countDocuments({ status: 'cancelled' }),
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] } } },
+        { $group: { _id: null, total: { $sum: '$total' } } },
+      ]),
+      // User registrations per day for last 30 days
+      User.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+      // Top buyers by order count
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] } } },
+        { $group: { _id: '$userId', orderCount: { $sum: 1 }, totalSpent: { $sum: '$total' } } },
+        { $sort: { totalSpent: -1 } },
+        { $limit: 10 },
+      ]),
+    ]);
+
+    // Enrich top buyers with user info
+    const buyerIds = topBuyers.map(b => b._id).filter(Boolean);
+    const buyerUsers = await User.find({ _id: { $in: buyerIds } }).select('name email').lean();
+    const buyerMap = Object.fromEntries(buyerUsers.map(u => [String(u._id), u]));
+    const enrichedBuyers = topBuyers.map(b => ({
+      ...b,
+      name: buyerMap[b._id]?.name || 'Unknown',
+      email: buyerMap[b._id]?.email || '',
+    }));
+
+    const totalRev = totalRevenue[0]?.total || 0;
+    const conversionRate = totalUsers > 0 ? Number(((paidOrders / totalUsers) * 100).toFixed(1)) : 0;
+    const buyRate = totalOrders > 0 ? Number(((paidOrders / totalOrders) * 100).toFixed(1)) : 0;
+
+    res.json({
+      success: true,
+      summary: {
+        totalUsers,
+        newUsersLast30,
+        newUsersLast7,
+        bannedUsers,
+        totalOrders,
+        paidOrders,
+        cancelledOrders,
+        totalRevenue: Number(totalRev.toFixed(2)),
+        conversionRate,
+        buyRate,
+        cancelRate: totalOrders > 0 ? Number(((cancelledOrders / totalOrders) * 100).toFixed(1)) : 0,
+      },
+      userGrowth,
+      topBuyers: enrichedBuyers,
+    });
+  } catch (err) {
+    console.error('[Admin] User analytics error:', err);
+    res.status(500).json({ error: 'Failed to load user analytics' });
+  }
+});
+
+// GET /api/admin/analytics/sellers — seller analytics
+router.get('/analytics/sellers', adminAuth, async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const CustomerOrder = mongoose.models.CustomerOrder ||
+      mongoose.model('CustomerOrder', new mongoose.Schema({}, { strict: false }), 'customerorders');
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalSellers,
+      activeSellers,
+      pendingSellers,
+      suspendedSellers,
+      newSellersLast30,
+      sellerGrowth,
+      allApplications,
+      allSellers,
+    ] = await Promise.all([
+      Seller.countDocuments({}),
+      Seller.countDocuments({ status: 'active' }),
+      Seller.countDocuments({ approvalStatus: 'pending_review' }),
+      Seller.countDocuments({ status: 'suspended' }),
+      Seller.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      Seller.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+      Application.find({ isDraft: false })
+        .select('sellerId price isFree views downloads verificationStatus appCategory appName')
+        .lean(),
+      Seller.find({}).select('_id name shop status approvalStatus createdAt').lean(),
+    ]);
+
+    // Per-seller stats from applications
+    const sellerStatsMap = {};
+    allApplications.forEach(app => {
+      const sid = String(app.sellerId);
+      if (!sellerStatsMap[sid]) {
+        sellerStatsMap[sid] = { appCount: 0, totalViews: 0, totalDownloads: 0, revenue: 0, verifiedApps: 0 };
+      }
+      sellerStatsMap[sid].appCount++;
+      sellerStatsMap[sid].totalViews += app.views || 0;
+      sellerStatsMap[sid].totalDownloads += app.downloads || 0;
+      if (app.verificationStatus === 'verified') sellerStatsMap[sid].verifiedApps++;
+      if (!app.isFree && app.price > 0) {
+        sellerStatsMap[sid].revenue += (app.price || 0) * (app.downloads || 0);
+      }
+    });
+
+    // Enrich sellers
+    const enrichedSellers = allSellers.map(s => ({
+      id: s._id,
+      name: s.shop?.shopName || s.name,
+      status: s.status,
+      approvalStatus: s.approvalStatus,
+      joinedAt: s.createdAt,
+      ...(sellerStatsMap[String(s._id)] || { appCount: 0, totalViews: 0, totalDownloads: 0, revenue: 0, verifiedApps: 0 }),
+    }));
+
+    const topByRevenue   = [...enrichedSellers].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+    const topByDownloads = [...enrichedSellers].sort((a, b) => b.totalDownloads - a.totalDownloads).slice(0, 10);
+    const topByApps      = [...enrichedSellers].sort((a, b) => b.appCount - a.appCount).slice(0, 10);
+
+    // Category breakdown
+    const catMap = {};
+    allApplications.forEach(app => {
+      const cat = app.appCategory || 'Other';
+      if (!catMap[cat]) catMap[cat] = { category: cat, count: 0, downloads: 0, revenue: 0 };
+      catMap[cat].count++;
+      catMap[cat].downloads += app.downloads || 0;
+      if (!app.isFree && app.price > 0) catMap[cat].revenue += (app.price || 0) * (app.downloads || 0);
+    });
+
+    const totalPlatformRevenue = allApplications.reduce((s, a) => {
+      if (!a.isFree && a.price > 0) return s + (a.price || 0) * (a.downloads || 0);
+      return s;
+    }, 0);
+
+    res.json({
+      success: true,
+      summary: {
+        totalSellers,
+        activeSellers,
+        pendingSellers,
+        suspendedSellers,
+        newSellersLast30,
+        totalApplications: allApplications.length,
+        verifiedApplications: allApplications.filter(a => a.verificationStatus === 'verified').length,
+        totalPlatformRevenue: Number(totalPlatformRevenue.toFixed(2)),
+        totalDownloads: allApplications.reduce((s, a) => s + (a.downloads || 0), 0),
+        totalViews: allApplications.reduce((s, a) => s + (a.views || 0), 0),
+      },
+      sellerGrowth,
+      topByRevenue,
+      topByDownloads,
+      topByApps,
+      categoryBreakdown: Object.values(catMap).sort((a, b) => b.downloads - a.downloads),
+    });
+  } catch (err) {
+    console.error('[Admin] Seller analytics error:', err);
+    res.status(500).json({ error: 'Failed to load seller analytics' });
+  }
+});
+
+// GET /api/admin/analytics/overview — overall platform analytics & finances
+router.get('/analytics/overview', adminAuth, async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const CustomerOrder = mongoose.models.CustomerOrder ||
+      mongoose.model('CustomerOrder', new mongoose.Schema({}, { strict: false }), 'customerorders');
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo  = new Date(now - 7  * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      totalSellers,
+      activeSellers,
+      totalApplications,
+      verifiedApplications,
+      allOrders,
+      revenueAgg,
+      revenueThisMonth,
+      revenueThisWeek,
+      ordersByStatus,
+      revenueByDay,
+      ordersByDay,
+      allApplications,
+    ] = await Promise.all([
+      User.countDocuments({}),
+      Seller.countDocuments({}),
+      Seller.countDocuments({ status: 'active' }),
+      Application.countDocuments({ isDraft: false }),
+      Application.countDocuments({ isDraft: false, verificationStatus: 'verified' }),
+      CustomerOrder.countDocuments({}),
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] } } },
+        { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } },
+      ]),
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] }, createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: { _id: null, total: { $sum: '$total' } } },
+      ]),
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] }, createdAt: { $gte: sevenDaysAgo } } },
+        { $group: { _id: null, total: { $sum: '$total' } } },
+      ]),
+      CustomerOrder.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+      // Revenue per day last 30 days
+      CustomerOrder.aggregate([
+        { $match: { paymentStatus: { $in: ['paid', 'submitted'] }, createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          revenue: { $sum: '$total' },
+          orders: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+      // Orders per day last 30 days
+      CustomerOrder.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+      Application.find({ isDraft: false })
+        .select('price isFree views downloads verificationStatus appCategory appName sellerId')
+        .lean(),
+    ]);
+
+    const totalRev = revenueAgg[0]?.total || 0;
+    const paidOrderCount = revenueAgg[0]?.count || 0;
+    const revThisMonth = revenueThisMonth[0]?.total || 0;
+    const revThisWeek  = revenueThisWeek[0]?.total || 0;
+
+    const statusMap = {};
+    ordersByStatus.forEach(s => { statusMap[s._id] = s.count; });
+
+    const totalDownloads = allApplications.reduce((s, a) => s + (a.downloads || 0), 0);
+    const totalViews     = allApplications.reduce((s, a) => s + (a.views || 0), 0);
+    const appRevenue     = allApplications.reduce((s, a) => {
+      if (!a.isFree && a.price > 0) return s + (a.price || 0) * (a.downloads || 0);
+      return s;
+    }, 0);
+
+    // Top applications overall
+    const topApps = [...allApplications]
+      .filter(a => !a.isFree && a.price > 0)
+      .map(a => ({ ...a, revenue: (a.price || 0) * (a.downloads || 0) }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+
+    res.json({
+      success: true,
+      summary: {
+        totalUsers,
+        totalSellers,
+        activeSellers,
+        totalApplications,
+        verifiedApplications,
+        totalOrders: allOrders,
+        paidOrders: paidOrderCount,
+        pendingOrders: statusMap['pending'] || 0,
+        cancelledOrders: statusMap['cancelled'] || 0,
+        totalRevenue: Number(totalRev.toFixed(2)),
+        revenueThisMonth: Number(revThisMonth.toFixed(2)),
+        revenueThisWeek: Number(revThisWeek.toFixed(2)),
+        totalDownloads,
+        totalViews,
+        appRevenue: Number(appRevenue.toFixed(2)),
+        conversionRate: totalViews > 0 ? Number(((totalDownloads / totalViews) * 100).toFixed(1)) : 0,
+        avgOrderValue: paidOrderCount > 0 ? Number((totalRev / paidOrderCount).toFixed(2)) : 0,
+      },
+      revenueByDay,
+      ordersByDay,
+      topApps,
+    });
+  } catch (err) {
+    console.error('[Admin] Overview analytics error:', err);
+    res.status(500).json({ error: 'Failed to load overview analytics' });
+  }
+});
+
 module.exports = router;
