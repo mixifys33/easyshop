@@ -1001,7 +1001,16 @@ const {
   getMaskedFromEmail,
   verifySmtpConnection,
   sendBulkCommunications,
+  sanitizeFeaturedItems,
 } = require('../services/adminEmailService');
+
+function getStorefrontUrl() {
+  return (
+    process.env.STOREFRONT_URL ||
+    process.env.FRONTEND_URL ||
+    'https://vettcodedev.vercel.app'
+  ).replace(/\/$/, '');
+}
 
 router.get('/communications/smtp-status', adminAuth, async (req, res) => {
   try {
@@ -1056,6 +1065,83 @@ router.get('/communications/sellers/recipients', adminAuth, async (req, res) => 
   } catch (err) {
     console.error('[Admin] Seller recipients error:', err);
     res.status(500).json({ success: false, error: 'Failed to load seller recipients' });
+  }
+});
+
+router.get('/communications/email-catalog', adminAuth, async (req, res) => {
+  try {
+    const Application = require('../models/Application');
+    const Product = require('../models/Product');
+    const { search = '', limit = 30 } = req.query;
+    const lim = Math.min(Math.max(Number(limit) || 30, 1), 50);
+    const storefront = getStorefrontUrl();
+
+    const appQuery = {
+      isDraft: false,
+      verificationStatus: 'verified',
+      isActive: true,
+    };
+    if (search.trim()) {
+      appQuery.$or = [
+        { appName: { $regex: search, $options: 'i' } },
+        { shortDescription: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const applications = await Application.find(appQuery)
+      .populate('sellerId', 'name shop.shopName')
+      .select('appName shortDescription price currency isFree appIcon screenshots appCategory')
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(lim)
+      .lean();
+
+    const prodQuery = {};
+    if (search.trim()) {
+      prodQuery.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const products = await Product.find(prodQuery)
+      .select('title description salePrice currency images category')
+      .sort({ createdAt: -1 })
+      .limit(Math.min(lim, 20))
+      .lean();
+
+    const items = [
+      ...applications.map((a) => ({
+        id: String(a._id),
+        type: 'application',
+        name: a.appName,
+        description: a.shortDescription,
+        price: a.price,
+        currency: a.currency,
+        isFree: !!a.isFree,
+        image: a.appIcon?.url || a.screenshots?.[0]?.url || null,
+        category: a.appCategory,
+        sellerName: a.sellerId?.shop?.shopName || a.sellerId?.name || '',
+        link: `${storefront}/product/${a._id}`,
+      })),
+      ...products.map((p) => ({
+        id: String(p._id),
+        type: 'product',
+        name: p.title,
+        description: (p.description || '').slice(0, 160),
+        price: p.salePrice,
+        currency: p.currency,
+        isFree: false,
+        image: p.images?.[0]?.url || null,
+        category: p.category,
+        sellerName: '',
+        link: `${storefront}/product/${p._id}`,
+      })),
+    ];
+
+    res.json({ success: true, items, storefrontUrl: storefront });
+  } catch (err) {
+    console.error('[Admin] Email catalog error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load email catalog' });
   }
 });
 
@@ -1133,7 +1219,16 @@ async function resolveUserRecipients({ recipientMode, recipientIds, includeBanne
 
 router.post('/communications/sellers/send', adminAuth, async (req, res) => {
   try {
-    const { subject, message, recipientMode = 'all', recipientIds = [], statusFilter = 'all' } = req.body;
+    const {
+      subject,
+      message,
+      recipientMode = 'selected',
+      recipientIds = [],
+      statusFilter = 'all',
+      featuredItems = [],
+      ctaLabel,
+      ctaUrl,
+    } = req.body;
 
     if (!subject?.trim() || !message?.trim()) {
       return res.status(400).json({ success: false, error: 'Subject and message are required' });
@@ -1156,6 +1251,9 @@ router.post('/communications/sellers/send', adminAuth, async (req, res) => {
       subject: subject.trim(),
       message: message.trim(),
       audienceLabel: 'Seller Communication',
+      featuredItems: sanitizeFeaturedItems(featuredItems),
+      ctaLabel: ctaLabel?.trim() || undefined,
+      ctaUrl: ctaUrl?.trim() || undefined,
     });
 
     res.json({ success: result.success, ...result });
@@ -1170,9 +1268,12 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
     const {
       subject,
       message,
-      recipientMode = 'all',
+      recipientMode = 'selected',
       recipientIds = [],
       includeBanned = false,
+      featuredItems = [],
+      ctaLabel,
+      ctaUrl,
     } = req.body;
 
     if (!subject?.trim() || !message?.trim()) {
@@ -1201,6 +1302,9 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
       subject: subject.trim(),
       message: message.trim(),
       audienceLabel: 'Customer Communication',
+      featuredItems: sanitizeFeaturedItems(featuredItems),
+      ctaLabel: ctaLabel?.trim() || undefined,
+      ctaUrl: ctaUrl?.trim() || undefined,
     });
 
     res.json({ success: result.success, ...result });
