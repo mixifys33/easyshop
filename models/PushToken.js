@@ -9,8 +9,12 @@ const pushTokenSchema = new mongoose.Schema({
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null, // null = guest/anonymous device
+    default: null,
+  },
+  userType: {
+    type: String,
+    enum: ['user', 'seller', 'admin', 'guest'],
+    default: 'guest',
   },
   platform: {
     type: String,

@@ -1005,6 +1005,63 @@ router.get('/analytics/overview', adminAuth, async (req, res) => {
   }
 });
 
+// ── Admin push notifications ─────────────────────────────────────────────────
+const { getPushTokenStats, sendPushByTarget } = require('../services/pushNotificationService');
+
+router.get('/notifications/stats', adminAuth, async (req, res) => {
+  try {
+    const stats = await getPushTokenStats();
+    res.json({
+      success: true,
+      stats: {
+        total: stats.total,
+        byUserType: {
+          users: stats.users,
+          sellers: stats.sellers,
+          guests: stats.guests,
+        },
+        invalid: stats.invalid,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin] Notification stats error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load notification stats' });
+  }
+});
+
+router.post('/notifications/send', adminAuth, async (req, res) => {
+  try {
+    const { title, body, target = 'all', data } = req.body;
+
+    if (!title?.trim() || !body?.trim()) {
+      return res.status(400).json({ success: false, error: 'Title and message are required' });
+    }
+
+    if (!['all', 'users', 'sellers'].includes(target)) {
+      return res.status(400).json({ success: false, error: 'Invalid target audience' });
+    }
+
+    const result = await sendPushByTarget({
+      title: title.trim(),
+      body: body.trim(),
+      target,
+      data: data || { type: 'admin_broadcast' },
+    });
+
+    res.json({
+      success: result.sent > 0 || result.total === 0,
+      sent: result.sent,
+      failed: result.failed,
+      total: result.total,
+      target: result.target,
+      error: result.total === 0 ? 'No registered devices for this audience' : null,
+    });
+  } catch (err) {
+    console.error('[Admin] Send notification error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to send notification' });
+  }
+});
+
 // ── Admin email communications (Gmail SMTP via .env) ─────────────────────────
 const {
   isSmtpConfigured,

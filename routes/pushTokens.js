@@ -15,7 +15,7 @@ const expo = new Expo();
 // ── Register / update a push token ──────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { token, userId, platform } = req.body;
+    const { token, userId, platform, userType } = req.body;
 
     if (!token) {
       return res.status(400).json({ error: 'Token is required' });
@@ -29,7 +29,13 @@ router.post('/register', async (req, res) => {
     // Upsert — update if token exists, create if not
     await PushToken.findOneAndUpdate(
       { token },
-      { token, userId: userId || null, platform: platform || 'android', updatedAt: new Date() },
+      {
+        token,
+        userId: userId || null,
+        platform: platform || 'android',
+        userType: userType || (userId ? 'user' : 'guest'),
+        updatedAt: new Date(),
+      },
       { upsert: true, new: true }
     );
 
@@ -103,5 +109,46 @@ router.get('/list', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch tokens' });
   }
 });
+
+// ── Legacy admin endpoints (x-admin-key) — prefer /api/admin/notifications/* with JWT
+const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'eshop-admin-secret-2025-x9k2m';
+const { getPushTokenStats, sendPushByTarget } = require('../services/pushNotificationService');
+
+function requireAdminKey(req, res, next) {
+  const key = req.headers['x-admin-key'] || req.body?.adminKey;
+  if (key !== ADMIN_SECRET) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  next();
+}
+
+router.get('/stats', requireAdminKey, async (req, res) => {
+  try {
+    const stats = await getPushTokenStats();
+    res.json({
+      success: true,
+      stats: {
+        total: stats.total,
+        byUserType: { users: stats.users, sellers: stats.sellers, guests: stats.guests },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to load stats' });
+  }
+});
+
+async function legacySend(req, res, target) {
+  try {
+    const { title, body, data } = req.body;
+    const result = await sendPushByTarget({ title, body, target, data });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+router.post('/broadcast', requireAdminKey, (req, res) => legacySend(req, res, 'all'));
+router.post('/send-to-users', requireAdminKey, (req, res) => legacySend(req, res, 'users'));
+router.post('/send-to-sellers', requireAdminKey, (req, res) => legacySend(req, res, 'sellers'));
 
 module.exports = router;
