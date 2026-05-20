@@ -999,7 +999,6 @@ router.get('/analytics/overview', adminAuth, async (req, res) => {
 const {
   isSmtpConfigured,
   getMaskedFromEmail,
-  verifySmtpConnection,
   sendBulkCommunications,
   sanitizeFeaturedItems,
 } = require('../services/adminEmailService');
@@ -1014,18 +1013,18 @@ function getStorefrontUrl() {
 
 router.get('/communications/smtp-status', adminAuth, async (req, res) => {
   try {
-    const verification = isSmtpConfigured()
-      ? await verifySmtpConnection()
-      : { ready: false, error: 'SMTP_USER and SMTP_PASS are required in .env' };
-
+    const configured = isSmtpConfigured();
     res.json({
       success: true,
-      configured: isSmtpConfigured(),
-      ready: verification.ready,
+      configured,
+      ready: configured,
+      verifyOk: null,
       fromEmail: getMaskedFromEmail(),
       host: process.env.SMTP_HOST || null,
       service: process.env.SMTP_SERVICE || null,
-      error: verification.error || null,
+      error: configured
+        ? null
+        : 'Add SMTP_USER and SMTP_PASS to the backend environment (Render dashboard or backend/.env locally).',
     });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to check SMTP status' });

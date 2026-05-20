@@ -1,11 +1,12 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+const smtpPort = Number(process.env.SMTP_PORT) || 465;
 const transporter = nodemailer.createTransport({
-  service: process.env.SMTP_SERVICE,
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: String(process.env.SMTP_PORT) === '465' || process.env.SMTP_SECURE !== 'false',
+  service: process.env.SMTP_SERVICE || 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: smtpPort,
+  secure: smtpPort === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -15,7 +16,9 @@ const transporter = nodemailer.createTransport({
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+  const user = String(process.env.SMTP_USER || '').trim().replace(/^["']|["']$/g, '');
+  const pass = String(process.env.SMTP_PASS || '').trim().replace(/^["']|["']$/g, '');
+  return Boolean(user && pass);
 }
 
 function getMaskedFromEmail() {
@@ -220,13 +223,7 @@ async function sendBulkCommunications({
 
   const verification = await verifySmtpConnection();
   if (!verification.ready) {
-    return {
-      success: false,
-      error: verification.error || 'SMTP connection failed',
-      sent: 0,
-      failed: recipients.length,
-      results: [],
-    };
+    console.warn('[AdminEmail] SMTP verify failed (will still attempt send):', verification.error);
   }
 
   const safeFeatured = sanitizeFeaturedItems(featuredItems);
