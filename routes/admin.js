@@ -1023,18 +1023,24 @@ function getStorefrontUrl() {
 
 router.get('/communications/smtp-status', adminAuth, async (req, res) => {
   try {
-    const configured = isSmtpConfigured();
+    const { TRANSPORT_VERSION } = require('../services/smtpClient');
+    const resendConfigured = Boolean(
+      String(process.env.RESEND_API_KEY || '').trim().replace(/^["']|["']$/g, '')
+    );
+    const configured = isSmtpConfigured() || resendConfigured;
     res.json({
       success: true,
       configured,
       ready: configured,
+      transportVersion: TRANSPORT_VERSION,
+      resendConfigured,
       verifyOk: null,
       fromEmail: getMaskedFromEmail(),
       host: process.env.SMTP_HOST || null,
       service: process.env.SMTP_SERVICE || null,
       error: configured
         ? null
-        : 'Add SMTP_USER and SMTP_PASS to the backend environment (Render dashboard or backend/.env locally).',
+        : 'Add SMTP_USER and SMTP_PASS, or RESEND_API_KEY, in Render environment.',
     });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to check SMTP status' });
@@ -1243,7 +1249,15 @@ router.post('/communications/sellers/send', adminAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Subject and message are required' });
     }
 
+    console.log('[Admin][email] POST sellers/send — resolving recipients…', {
+      recipientMode,
+      recipientIdsCount: recipientIds?.length,
+      statusFilter,
+    });
+
     const recipients = await resolveSellerRecipients({ recipientMode, recipientIds, statusFilter });
+    console.log('[Admin][email] sellers recipients resolved', { count: recipients.length });
+
     if (!recipients.length) {
       return res.status(400).json({ success: false, error: 'No seller recipients matched your selection' });
     }
@@ -1255,6 +1269,7 @@ router.post('/communications/sellers/send', adminAuth, async (req, res) => {
       });
     }
 
+    const sendStarted = Date.now();
     const result = await sendBulkCommunications({
       recipients,
       subject: subject.trim(),
@@ -1265,9 +1280,16 @@ router.post('/communications/sellers/send', adminAuth, async (req, res) => {
       ctaUrl: ctaUrl?.trim() || undefined,
     });
 
+    console.log('[Admin][email] POST sellers/send done', {
+      ms: Date.now() - sendStarted,
+      sent: result.sent,
+      failed: result.failed,
+      error: result.error,
+    });
+
     res.json({ success: result.success, ...result });
   } catch (err) {
-    console.error('[Admin] Send seller communications error:', err);
+    console.error('[Admin][email] POST sellers/send ERROR:', err.message, err.stack);
     res.status(500).json({ success: false, error: err.message || 'Failed to send emails' });
   }
 });
@@ -1289,11 +1311,18 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Subject and message are required' });
     }
 
+    console.log('[Admin][email] POST users/send — resolving recipients…', {
+      recipientMode,
+      recipientIdsCount: recipientIds?.length,
+      includeBanned,
+    });
+
     const recipients = await resolveUserRecipients({
       recipientMode,
       recipientIds,
       includeBanned: Boolean(includeBanned),
     });
+    console.log('[Admin][email] users recipients resolved', { count: recipients.length });
 
     if (!recipients.length) {
       return res.status(400).json({ success: false, error: 'No user recipients matched your selection' });
@@ -1306,6 +1335,7 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
       });
     }
 
+    const sendStarted = Date.now();
     const result = await sendBulkCommunications({
       recipients,
       subject: subject.trim(),
@@ -1316,9 +1346,16 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
       ctaUrl: ctaUrl?.trim() || undefined,
     });
 
+    console.log('[Admin][email] POST users/send done', {
+      ms: Date.now() - sendStarted,
+      sent: result.sent,
+      failed: result.failed,
+      error: result.error,
+    });
+
     res.json({ success: result.success, ...result });
   } catch (err) {
-    console.error('[Admin] Send user communications error:', err);
+    console.error('[Admin][email] POST users/send ERROR:', err.message, err.stack);
     res.status(500).json({ success: false, error: err.message || 'Failed to send emails' });
   }
 });

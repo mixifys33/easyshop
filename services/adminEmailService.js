@@ -1,19 +1,18 @@
-const nodemailer = require('nodemailer');
-require('dotenv').config();
-
-const smtpPort = Number(process.env.SMTP_PORT) || 465;
-const transporter = nodemailer.createTransport({
-  service: process.env.SMTP_SERVICE || 'gmail',
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: smtpPort,
-  secure: smtpPort === 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const { sendAdminCommunicationMail } = require('./emailService');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const BULK_CONCURRENCY = 3;
+const BULK_BATCH_DELAY_MS = 50;
+
+function log(step, detail) {
+  const ts = new Date().toISOString();
+  if (detail !== undefined) {
+    console.log(`[AdminEmail] ${ts} ${step}`, detail);
+  } else {
+    console.log(`[AdminEmail] ${ts} ${step}`);
+  }
+}
 
 function isSmtpConfigured() {
   const user = String(process.env.SMTP_USER || '').trim().replace(/^["']|["']$/g, '');
@@ -22,17 +21,12 @@ function isSmtpConfigured() {
 }
 
 function getMaskedFromEmail() {
-  const email = process.env.SMTP_USER || '';
+  const email = String(process.env.SMTP_USER || '').trim().replace(/^["']|["']$/g, '');
   if (!email.includes('@')) return null;
   const [local, domain] = email.split('@');
   const maskedLocal =
     local.length <= 2 ? `${local[0] || ''}*` : `${local.slice(0, 2)}***`;
   return `${maskedLocal}@${domain}`;
-}
-
-function getFromAddress() {
-  const name = process.env.SMTP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'VettCode';
-  return { name, address: process.env.SMTP_USER };
 }
 
 function escapeHtml(text = '') {
@@ -71,7 +65,7 @@ function buildFeaturedItemsHtml(featuredItems = []) {
       return `
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;">
           <tr>
-            ${imgCell}
+            ${imgCell.replace('<motion-div', '<motion-div').replace('</motion-div>', '</div>')}
             <td style="padding:12px 14px 12px 0;vertical-align:top;">
               <p style="margin:0 0 4px;font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;">${typeLabel}</p>
               <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#0f172a;">${escapeHtml(item.name)}</p>
@@ -137,11 +131,11 @@ function buildCommunicationHtml({
     '<html lang="en">',
     '<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/></head>',
     '<body style="font-family:Segoe UI,Tahoma,sans-serif;background:#f1f5f9;margin:0;padding:24px;">',
-    '<div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(15,23,42,0.06);">',
+    '<div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;">',
     '<div style="background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 100%);padding:32px 24px;text-align:center;">',
     '<p style="margin:0;color:rgba(255,255,255,0.85);font-size:12px;letter-spacing:2px;text-transform:uppercase;">VettCode</p>',
     `<p style="margin:6px 0 0;color:rgba(255,255,255,0.75);font-size:13px;">${escapeHtml(audienceLabel)}</p>`,
-    `<h1 style="margin:14px 0 0;color:#ffffff;font-size:24px;font-weight:800;line-height:1.3;">${safeSubject}</h1>`,
+    `<h1 style="margin:14px 0 0;color:#ffffff;font-size:24px;font-weight:800;">${safeSubject}</h1>`,
     '</div>',
     '<div style="padding:28px 24px;">',
     `<p style="margin:0 0 18px;color:#334155;font-size:16px;">Hi <strong>${escapeHtml(recipientName || 'there')}</strong>,</p>`,
@@ -150,8 +144,8 @@ function buildCommunicationHtml({
     featuredHtml,
     '</div>',
     '<div style="background:#f8fafc;padding:22px 24px;text-align:center;border-top:1px solid #e2e8f0;">',
-    '<p style="margin:0;color:#64748b;font-size:13px;">Questions? Reply to this email — we are happy to help.</p>',
-    `<p style="margin:10px 0 0;color:#94a3b8;font-size:11px;">&copy; ${year} VettCode · Marketplace for apps &amp; digital products</p>`,
+    '<p style="margin:0;color:#64748b;font-size:13px;">Questions? Reply to this email.</p>',
+    `<p style="margin:10px 0 0;color:#94a3b8;font-size:11px;">&copy; ${year} VettCode</p>`,
     '</div>',
     '</div>',
     '</body>',
@@ -160,67 +154,35 @@ function buildCommunicationHtml({
 }
 
 async function verifySmtpConnection() {
-  if (!isSmtpConfigured()) {
-    return { ready: false, error: 'SMTP credentials are not configured in environment variables' };
-  }
-  try {
-    await transporter.verify();
-    return { ready: true };
-  } catch (err) {
-    return { ready: false, error: err.message };
-  }
+  log('verifySmtpConnection skipped (use Render logs on actual send)');
+  return { ready: isSmtpConfigured(), error: null };
 }
 
-const EMAIL_SEND_TIMEOUT_MS = 45000;
-const BULK_CONCURRENCY = 5;
-const BULK_BATCH_DELAY_MS = 40;
+async function sendCommunicationEmail(opts) {
+  const html = buildCommunicationHtml(opts);
+  const text = `Hello ${opts.recipientName || 'there'},\n\n${opts.message}\n\n— VettCode`;
 
-function withTimeout(promise, ms, label = 'Operation') {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms);
-    }),
-  ]);
-}
+  log('sendCommunicationEmail → emailService', { to: opts.to });
 
-async function sendCommunicationEmail({
-  to,
-  name,
-  subject,
-  message,
-  audienceLabel,
-  featuredItems,
-  ctaLabel,
-  ctaUrl,
-}) {
-  const html = buildCommunicationHtml({
-    subject,
-    message,
-    recipientName: name,
-    audienceLabel,
-    featuredItems,
-    ctaLabel,
-    ctaUrl,
+  const result = await sendAdminCommunicationMail({
+    to: opts.to,
+    subject: opts.subject,
+    html,
+    text,
   });
 
-  const info = await withTimeout(
-    transporter.sendMail({
-      from: getFromAddress(),
-      to,
-      subject,
-      html,
-      text: `Hello ${name || 'there'},\n\n${message}\n\n— VettCode`,
-    }),
-    EMAIL_SEND_TIMEOUT_MS,
-    'Email send'
-  );
-
-  return { success: true, messageId: info.messageId };
+  return result;
 }
 
-async function sendToOneRecipient(recipient, emailOpts) {
+async function sendToOneRecipient(recipient, emailOpts, index, total) {
+  log(`recipient ${index + 1}/${total} start`, {
+    id: recipient.id,
+    email: recipient.email,
+    name: recipient.name,
+  });
+
   if (!recipient.email) {
+    log(`recipient ${index + 1}/${total} skip — no email`);
     return {
       id: recipient.id,
       email: recipient.email,
@@ -234,8 +196,15 @@ async function sendToOneRecipient(recipient, emailOpts) {
     const result = await sendCommunicationEmail({
       to: recipient.email,
       name: recipient.name,
-      ...emailOpts,
+      subject: emailOpts.subject,
+      message: emailOpts.message,
+      recipientName: recipient.name,
+      audienceLabel: emailOpts.audienceLabel,
+      featuredItems: emailOpts.featuredItems,
+      ctaLabel: emailOpts.ctaLabel,
+      ctaUrl: emailOpts.ctaUrl,
     });
+    log(`recipient ${index + 1}/${total} OK`, { messageId: result.messageId });
     return {
       id: recipient.id,
       email: recipient.email,
@@ -244,12 +213,16 @@ async function sendToOneRecipient(recipient, emailOpts) {
       messageId: result.messageId,
     };
   } catch (err) {
+    log(`recipient ${index + 1}/${total} FAILED`, {
+      error: err.message,
+      code: err.code,
+    });
     return {
       id: recipient.id,
       email: recipient.email,
       name: recipient.name,
       success: false,
-      error: err.message,
+      error: err.message || 'Send failed',
     };
   }
 }
@@ -263,19 +236,26 @@ async function sendBulkCommunications({
   ctaLabel,
   ctaUrl,
 }) {
+  const bulkStarted = Date.now();
+  log('═══ BULK SEND START ═══', {
+    total: recipients.length,
+    subject: String(subject || '').slice(0, 60),
+    audienceLabel,
+    featuredCount: featuredItems?.length || 0,
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT,
+    smtpConfigured: isSmtpConfigured(),
+  });
+
   if (!isSmtpConfigured()) {
+    log('ABORT — SMTP not configured on server');
     return {
       success: false,
-      error: 'SMTP is not configured. Set SMTP_USER and SMTP_PASS in your .env file.',
+      error: 'SMTP is not configured. Set SMTP_USER and SMTP_PASS in Render environment or backend .env.',
       sent: 0,
       failed: recipients.length,
       results: [],
     };
-  }
-
-  const verification = await verifySmtpConnection();
-  if (!verification.ready) {
-    console.warn('[AdminEmail] SMTP verify failed (will still attempt send):', verification.error);
   }
 
   const safeFeatured = sanitizeFeaturedItems(featuredItems);
@@ -294,8 +274,16 @@ async function sendBulkCommunications({
 
   for (let i = 0; i < recipients.length; i += BULK_CONCURRENCY) {
     const batch = recipients.slice(i, i + BULK_CONCURRENCY);
+    log(`batch ${Math.floor(i / BULK_CONCURRENCY) + 1}`, {
+      size: batch.length,
+      from: i + 1,
+      to: i + batch.length,
+    });
+
     const batchResults = await Promise.all(
-      batch.map((recipient) => sendToOneRecipient(recipient, emailOpts))
+      batch.map((recipient, batchIdx) =>
+        sendToOneRecipient(recipient, emailOpts, i + batchIdx, recipients.length)
+      )
     );
 
     for (const row of batchResults) {
@@ -310,6 +298,14 @@ async function sendBulkCommunications({
   }
 
   const firstError = results.find((r) => !r.success)?.error;
+
+  log('═══ BULK SEND END ═══', {
+    ms: Date.now() - bulkStarted,
+    sent,
+    failed,
+    total: recipients.length,
+    firstError: firstError || null,
+  });
 
   return {
     success: sent > 0,
