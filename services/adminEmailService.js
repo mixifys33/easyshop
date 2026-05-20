@@ -2,8 +2,8 @@ const { sendAdminCommunicationMail } = require('./emailService');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const BULK_CONCURRENCY = 3;
-const BULK_BATCH_DELAY_MS = 50;
+const BULK_CONCURRENCY = 1;
+const BULK_BATCH_DELAY_MS = 0;
 
 function log(step, detail) {
   const ts = new Date().toISOString();

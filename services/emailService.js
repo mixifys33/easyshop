@@ -1,19 +1,28 @@
-﻿const { sendMailReliable, verifySmtpReliable, cleanEnv, getSmtpAuth } = require('./smtpClient');
+﻿const nodemailer = require('nodemailer');
+require('dotenv').config();
 
-const smtpUser = getSmtpAuth().user;
+function cleanEnv(value) {
+  return String(value || '').trim().replace(/^["']|["']$/g, '');
+}
 
-// Shared sender — uses Resend HTTP on Render when RESEND_API_KEY is set, else Gmail SMTP 587/465
-const transporter = {
-  sendMail: (mailOptions) => sendMailReliable(mailOptions),
-  verify: (cb) => {
-    verifySmtpReliable()
-      .then((r) => (r.ready ? cb(null, true) : cb(new Error(r.error))))
-      .catch((e) => cb(e));
+// Same Gmail SMTP config used by OTP — do not change for admin mail
+const transporter = nodemailer.createTransport({
+  service: process.env.SMTP_SERVICE,
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: true,
+  auth: {
+    user: cleanEnv(process.env.SMTP_USER),
+    pass: cleanEnv(process.env.SMTP_PASS),
   },
-};
+});
 
-verifySmtpReliable().then((r) => {
-  console.log('[email] Transport ready check:', r);
+transporter.verify((error) => {
+  if (error) {
+    console.log('[email] Transporter verify error:', error.message);
+  } else {
+    console.log('[email] Transporter ready (OTP + admin use this)');
+  }
 });
 
 // Generate OTP (4-digit for sellers, 6-digit for users)
@@ -1185,31 +1194,26 @@ const sendRefundCompletedToUser = async (email, userName, order, refundDetails) 
 };
 
 /**
- * Admin bulk communication emails — uses the same transporter as OTP/order mail.
+ * Admin bulk email — identical transporter + auth as OTP (sendUserOTPEmail / sendOTPEmail).
  */
 const sendAdminCommunicationMail = async ({ to, subject, html, text }) => {
-  const log = (step, detail) =>
-    console.log(`[email][admin] ${step}`, detail !== undefined ? detail : '');
-
-  log('1/3 prepare', { to, subject: String(subject || '').slice(0, 60) });
-
-  const auth = getSmtpAuth();
-  if (!auth.user && !cleanEnv(process.env.RESEND_API_KEY)) {
-    throw new Error('Set SMTP_USER/SMTP_PASS or RESEND_API_KEY on the server');
+  const smtpUser = cleanEnv(process.env.SMTP_USER);
+  if (!smtpUser || !cleanEnv(process.env.SMTP_PASS)) {
+    throw new Error('SMTP_USER and SMTP_PASS must be set (same as OTP emails)');
   }
 
-  const fromUser = auth.user || cleanEnv(process.env.RESEND_FROM);
-  log('2/3 send', { from: fromUser?.replace(/(.{2}).+(@.+)/, '$1***$2') });
-
+  console.log('[email][admin] sendMail start', { to, subject: String(subject || '').slice(0, 60) });
   const started = Date.now();
+
   const info = await transporter.sendMail({
-    from: { name: cleanEnv(process.env.SMTP_FROM_NAME) || 'VettCode', address: fromUser },
+    from: { name: cleanEnv(process.env.SMTP_FROM_NAME) || 'VettCode', address: smtpUser },
     to,
     subject,
     html,
     text: text || subject,
   });
-  log('3/3 success', { messageId: info.messageId, provider: info.provider, ms: Date.now() - started });
+
+  console.log('[email][admin] sendMail OK', { messageId: info.messageId, ms: Date.now() - started });
   return { success: true, messageId: info.messageId };
 };
 

@@ -1023,24 +1023,19 @@ function getStorefrontUrl() {
 
 router.get('/communications/smtp-status', adminAuth, async (req, res) => {
   try {
-    const { TRANSPORT_VERSION } = require('../services/smtpClient');
-    const resendConfigured = Boolean(
-      String(process.env.RESEND_API_KEY || '').trim().replace(/^["']|["']$/g, '')
-    );
-    const configured = isSmtpConfigured() || resendConfigured;
+    const configured = isSmtpConfigured();
     res.json({
       success: true,
       configured,
       ready: configured,
-      transportVersion: TRANSPORT_VERSION,
-      resendConfigured,
-      verifyOk: null,
+      transportVersion: 4,
+      usesSameTransportAsOtp: true,
       fromEmail: getMaskedFromEmail(),
       host: process.env.SMTP_HOST || null,
       service: process.env.SMTP_SERVICE || null,
       error: configured
         ? null
-        : 'Add SMTP_USER and SMTP_PASS, or RESEND_API_KEY, in Render environment.',
+        : 'Add SMTP_USER and SMTP_PASS to the backend environment (same keys as OTP).',
     });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to check SMTP status' });
