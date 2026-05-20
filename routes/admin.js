@@ -995,4 +995,219 @@ router.get('/analytics/overview', adminAuth, async (req, res) => {
   }
 });
 
+// ── Admin email communications (Gmail SMTP via .env) ─────────────────────────
+const {
+  isSmtpConfigured,
+  getMaskedFromEmail,
+  verifySmtpConnection,
+  sendBulkCommunications,
+} = require('../services/adminEmailService');
+
+router.get('/communications/smtp-status', adminAuth, async (req, res) => {
+  try {
+    const verification = isSmtpConfigured()
+      ? await verifySmtpConnection()
+      : { ready: false, error: 'SMTP_USER and SMTP_PASS are required in .env' };
+
+    res.json({
+      success: true,
+      configured: isSmtpConfigured(),
+      ready: verification.ready,
+      fromEmail: getMaskedFromEmail(),
+      host: process.env.SMTP_HOST || null,
+      service: process.env.SMTP_SERVICE || null,
+      error: verification.error || null,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to check SMTP status' });
+  }
+});
+
+router.get('/communications/sellers/recipients', adminAuth, async (req, res) => {
+  try {
+    const { status, search = '' } = req.query;
+    const query = { email: { $exists: true, $ne: '' } };
+    if (status && status !== 'all') query.status = status;
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { 'shop.shopName': { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const sellers = await Seller.find(query)
+      .select('name email status approvalStatus shop.shopName createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      recipients: sellers.map((s) => ({
+        id: String(s._id),
+        name: s.name,
+        email: s.email,
+        status: s.status,
+        approvalStatus: s.approvalStatus,
+        shopName: s.shop?.shopName || '',
+      })),
+      count: sellers.length,
+    });
+  } catch (err) {
+    console.error('[Admin] Seller recipients error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load seller recipients' });
+  }
+});
+
+router.get('/communications/users/recipients', adminAuth, async (req, res) => {
+  try {
+    const { search = '', includeBanned } = req.query;
+    const query = { email: { $exists: true, $ne: '' } };
+    if (includeBanned !== 'true') query.isBanned = { $ne: true };
+
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const users = await User.find(query)
+      .select('name email role isBanned createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      recipients: users.map((u) => ({
+        id: String(u._id),
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        isBanned: u.isBanned,
+      })),
+      count: users.length,
+    });
+  } catch (err) {
+    console.error('[Admin] User recipients error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load user recipients' });
+  }
+});
+
+async function resolveSellerRecipients({ recipientMode, recipientIds, statusFilter }) {
+  if (recipientMode === 'selected' && Array.isArray(recipientIds) && recipientIds.length) {
+    const sellers = await Seller.find({
+      _id: { $in: recipientIds },
+      email: { $exists: true, $ne: '' },
+    })
+      .select('name email')
+      .lean();
+    return sellers.map((s) => ({ id: String(s._id), name: s.name, email: s.email }));
+  }
+
+  const query = { email: { $exists: true, $ne: '' } };
+  if (statusFilter && statusFilter !== 'all') query.status = statusFilter;
+
+  const sellers = await Seller.find(query).select('name email').lean();
+  return sellers.map((s) => ({ id: String(s._id), name: s.name, email: s.email }));
+}
+
+async function resolveUserRecipients({ recipientMode, recipientIds, includeBanned }) {
+  if (recipientMode === 'selected' && Array.isArray(recipientIds) && recipientIds.length) {
+    const users = await User.find({
+      _id: { $in: recipientIds },
+      email: { $exists: true, $ne: '' },
+    })
+      .select('name email')
+      .lean();
+    return users.map((u) => ({ id: String(u._id), name: u.name, email: u.email }));
+  }
+
+  const query = { email: { $exists: true, $ne: '' } };
+  if (!includeBanned) query.isBanned = { $ne: true };
+
+  const users = await User.find(query).select('name email').lean();
+  return users.map((u) => ({ id: String(u._id), name: u.name, email: u.email }));
+}
+
+router.post('/communications/sellers/send', adminAuth, async (req, res) => {
+  try {
+    const { subject, message, recipientMode = 'all', recipientIds = [], statusFilter = 'all' } = req.body;
+
+    if (!subject?.trim() || !message?.trim()) {
+      return res.status(400).json({ success: false, error: 'Subject and message are required' });
+    }
+
+    const recipients = await resolveSellerRecipients({ recipientMode, recipientIds, statusFilter });
+    if (!recipients.length) {
+      return res.status(400).json({ success: false, error: 'No seller recipients matched your selection' });
+    }
+
+    if (recipients.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Maximum 200 recipients per send. Narrow your selection.',
+      });
+    }
+
+    const result = await sendBulkCommunications({
+      recipients,
+      subject: subject.trim(),
+      message: message.trim(),
+      audienceLabel: 'Seller Communication',
+    });
+
+    res.json({ success: result.success, ...result });
+  } catch (err) {
+    console.error('[Admin] Send seller communications error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to send emails' });
+  }
+});
+
+router.post('/communications/users/send', adminAuth, async (req, res) => {
+  try {
+    const {
+      subject,
+      message,
+      recipientMode = 'all',
+      recipientIds = [],
+      includeBanned = false,
+    } = req.body;
+
+    if (!subject?.trim() || !message?.trim()) {
+      return res.status(400).json({ success: false, error: 'Subject and message are required' });
+    }
+
+    const recipients = await resolveUserRecipients({
+      recipientMode,
+      recipientIds,
+      includeBanned: Boolean(includeBanned),
+    });
+
+    if (!recipients.length) {
+      return res.status(400).json({ success: false, error: 'No user recipients matched your selection' });
+    }
+
+    if (recipients.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Maximum 200 recipients per send. Narrow your selection.',
+      });
+    }
+
+    const result = await sendBulkCommunications({
+      recipients,
+      subject: subject.trim(),
+      message: message.trim(),
+      audienceLabel: 'Customer Communication',
+    });
+
+    res.json({ success: result.success, ...result });
+  } catch (err) {
+    console.error('[Admin] Send user communications error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to send emails' });
+  }
+});
+
 module.exports = router;
