@@ -506,15 +506,25 @@ router.get('/orders', adminAuth, async (req, res) => {
 router.get('/products', adminAuth, async (req, res) => {
   try {
     const Product = require('../models/Product');
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 200, search = '' } = req.query;
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 500);
+    const query = {};
+    if (search.trim()) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+      ];
+    }
 
-    const products = await Product.find({})
+    const products = await Product.find(query)
+      .populate('sellerId', 'name email shop.shopName')
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
+      .skip((Math.max(parseInt(page, 10), 1) - 1) * lim)
+      .limit(lim)
       .lean();
 
-    const total = await Product.countDocuments({});
+    const total = await Product.countDocuments(query);
     res.json({ success: true, products, total });
   } catch (err) {
     console.error('[Admin] Get products error:', err);

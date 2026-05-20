@@ -171,6 +171,19 @@ async function verifySmtpConnection() {
   }
 }
 
+const EMAIL_SEND_TIMEOUT_MS = 45000;
+const BULK_CONCURRENCY = 5;
+const BULK_BATCH_DELAY_MS = 40;
+
+function withTimeout(promise, ms, label = 'Operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms);
+    }),
+  ]);
+}
+
 async function sendCommunicationEmail({
   to,
   name,
@@ -191,15 +204,54 @@ async function sendCommunicationEmail({
     ctaUrl,
   });
 
-  const info = await transporter.sendMail({
-    from: getFromAddress(),
-    to,
-    subject,
-    html,
-    text: `Hello ${name || 'there'},\n\n${message}\n\n— VettCode`,
-  });
+  const info = await withTimeout(
+    transporter.sendMail({
+      from: getFromAddress(),
+      to,
+      subject,
+      html,
+      text: `Hello ${name || 'there'},\n\n${message}\n\n— VettCode`,
+    }),
+    EMAIL_SEND_TIMEOUT_MS,
+    'Email send'
+  );
 
   return { success: true, messageId: info.messageId };
+}
+
+async function sendToOneRecipient(recipient, emailOpts) {
+  if (!recipient.email) {
+    return {
+      id: recipient.id,
+      email: recipient.email,
+      name: recipient.name,
+      success: false,
+      error: 'Missing email address',
+    };
+  }
+
+  try {
+    const result = await sendCommunicationEmail({
+      to: recipient.email,
+      name: recipient.name,
+      ...emailOpts,
+    });
+    return {
+      id: recipient.id,
+      email: recipient.email,
+      name: recipient.name,
+      success: true,
+      messageId: result.messageId,
+    };
+  } catch (err) {
+    return {
+      id: recipient.id,
+      email: recipient.email,
+      name: recipient.name,
+      success: false,
+      error: err.message,
+    };
+  }
 }
 
 async function sendBulkCommunications({
@@ -227,55 +279,37 @@ async function sendBulkCommunications({
   }
 
   const safeFeatured = sanitizeFeaturedItems(featuredItems);
+  const emailOpts = {
+    subject,
+    message,
+    audienceLabel,
+    featuredItems: safeFeatured,
+    ctaLabel,
+    ctaUrl,
+  };
+
   const results = [];
   let sent = 0;
   let failed = 0;
 
-  for (const recipient of recipients) {
-    if (!recipient.email) {
-      failed += 1;
-      results.push({
-        id: recipient.id,
-        email: recipient.email,
-        name: recipient.name,
-        success: false,
-        error: 'Missing email address',
-      });
-      continue;
+  for (let i = 0; i < recipients.length; i += BULK_CONCURRENCY) {
+    const batch = recipients.slice(i, i + BULK_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((recipient) => sendToOneRecipient(recipient, emailOpts))
+    );
+
+    for (const row of batchResults) {
+      results.push(row);
+      if (row.success) sent += 1;
+      else failed += 1;
     }
 
-    try {
-      const result = await sendCommunicationEmail({
-        to: recipient.email,
-        name: recipient.name,
-        subject,
-        message,
-        audienceLabel,
-        featuredItems: safeFeatured,
-        ctaLabel,
-        ctaUrl,
-      });
-      sent += 1;
-      results.push({
-        id: recipient.id,
-        email: recipient.email,
-        name: recipient.name,
-        success: true,
-        messageId: result.messageId,
-      });
-    } catch (err) {
-      failed += 1;
-      results.push({
-        id: recipient.id,
-        email: recipient.email,
-        name: recipient.name,
-        success: false,
-        error: err.message,
-      });
+    if (i + BULK_CONCURRENCY < recipients.length) {
+      await sleep(BULK_BATCH_DELAY_MS);
     }
-
-    await sleep(120);
   }
+
+  const firstError = results.find((r) => !r.success)?.error;
 
   return {
     success: sent > 0,
@@ -283,6 +317,7 @@ async function sendBulkCommunications({
     failed,
     total: recipients.length,
     results,
+    error: sent === 0 ? firstError || 'All emails failed to send' : failed > 0 ? `${failed} failed` : null,
   };
 }
 
