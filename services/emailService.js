@@ -5,16 +5,21 @@ function cleanEnv(value) {
   return String(value || '').trim().replace(/^["']|["']$/g, '');
 }
 
-// Same Gmail SMTP config used by OTP — do not change for admin mail
+// Gmail SMTP config used by OTP + admin bulk email.
+// Port 587 + STARTTLS is faster than 465/SSL on cloud hosts like Render.
+const smtpPort = Number(cleanEnv(process.env.SMTP_PORT)) || 587;
 const transporter = nodemailer.createTransport({
-  service: process.env.SMTP_SERVICE,
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: true,
+  host: cleanEnv(process.env.SMTP_HOST) || 'smtp.gmail.com',
+  port: smtpPort,
+  secure: smtpPort === 465,          // true only for port 465
   auth: {
     user: cleanEnv(process.env.SMTP_USER),
     pass: cleanEnv(process.env.SMTP_PASS),
   },
+  connectionTimeout: 15000,          // 15s to establish TCP connection
+  greetingTimeout: 10000,          // 10s for SMTP greeting
+  socketTimeout: 30000,          // 30s per socket operation
+  pool: false,                       // fresh connection per send (avoids stale-pool hangs)
 });
 
 transporter.verify((error) => {
@@ -40,7 +45,7 @@ const generateUserOTP = () => {
 // Send OTP email for users (6-digit) with user-focused design
 const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verification') => {
   const isPasswordReset = purpose === 'Password Reset';
-  
+
   const htmlTemplate = `
     <!DOCTYPE html>
     <html lang="en">
@@ -302,35 +307,35 @@ const sendUserOTPEmail = async (email, name, otp, purpose = 'Account Verificatio
       address: process.env.SMTP_USER
     },
     to: email,
-    subject: isPasswordReset ? 
-      'ðŸ” Reset Your Global Investments Password - Secure Access Code' : 
+    subject: isPasswordReset ?
+      'ðŸ” Reset Your Global Investments Password - Secure Access Code' :
       'ðŸ›ï¸ Welcome to Global Investments - Verify Your Account!',
     html: htmlTemplate,
     text: `
 Hello ${name || (isPasswordReset ? 'Valued Customer' : 'New Investor')}!
 
-${isPasswordReset ? 
-  `We received a request to reset your password for your Global Investments account.` :
-  `Welcome to Global Investments! We're excited to have you join our community of smart investors.`
-}
+${isPasswordReset ?
+        `We received a request to reset your password for your Global Investments account.` :
+        `Welcome to Global Investments! We're excited to have you join our community of smart investors.`
+      }
 
 Your ${isPasswordReset ? 'password reset' : 'verification'} code is: ${otp}
 
-This code is valid for 10 minutes. ${isPasswordReset ? 
-  'Enter it to reset your password.' : 
-  'Enter it to complete your account setup and start investing!'
-}
+This code is valid for 10 minutes. ${isPasswordReset ?
+        'Enter it to reset your password.' :
+        'Enter it to complete your account setup and start investing!'
+      }
 
-${isPasswordReset ? 
-  `If you didn't request a password reset, please ignore this email.` :
-  `You're about to discover:
+${isPasswordReset ?
+        `If you didn't request a password reset, please ignore this email.` :
+        `You're about to discover:
 - Diverse investment opportunities worldwide
 - Expert-guided investment strategies
 - Multiple payment options
 - Quick delivery to your doorstep
 - 24/7 customer support
 - Exclusive deals and discounts`
-}
+      }
 
 Need help? Contact our customer support team.
 
@@ -350,7 +355,7 @@ The Global Investments Team
 };
 const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') => {
   const isPasswordReset = purpose === 'Password Reset';
-  
+
   const htmlTemplate = `
     <!DOCTYPE html>
     <html lang="en">
@@ -603,28 +608,28 @@ const sendOTPEmail = async (email, name, otp, purpose = 'Account Verification') 
       address: process.env.SMTP_USER
     },
     to: email,
-    subject: isPasswordReset ? 
-      'ðŸ” Reset Your Global Investments Password - Secure Access Code' : 
+    subject: isPasswordReset ?
+      'ðŸ” Reset Your Global Investments Password - Secure Access Code' :
       'ðŸ” Verify Your Global Investments advisor account - Your Investment Journey Begins!',
     html: htmlTemplate,
     text: `
 Hello ${name || (isPasswordReset ? 'Valued Advisor' : 'Future Investor')}!
 
-${isPasswordReset ? 
-  `We received a request to reset your password for your Global Investments advisor account.` :
-  `Welcome to Global Investments! `
-}
+${isPasswordReset ?
+        `We received a request to reset your password for your Global Investments advisor account.` :
+        `Welcome to Global Investments! `
+      }
 
 Your ${isPasswordReset ? 'password reset' : 'verification'} code is: ${otp}
 
-This code is valid for 10 minutes. ${isPasswordReset ? 
-  'Enter it to reset your password.' : 
-  'Enter it to complete your advisor account setup.'
-}
+This code is valid for 10 minutes. ${isPasswordReset ?
+        'Enter it to reset your password.' :
+        'Enter it to complete your advisor account setup.'
+      }
 
-${isPasswordReset ? 
-  `If you didn't request a password reset, please ignore this email.` :
-  `You're about to join thousands of successful sellers who are building their empires with us!
+${isPasswordReset ?
+        `If you didn't request a password reset, please ignore this email.` :
+        `You're about to join thousands of successful sellers who are building their empires with us!
 
 What awaits you:
 - Reach millions of customers
@@ -632,7 +637,7 @@ What awaits you:
 - Multiple payment options
 - 24/7 seller support
 - Marketing tools to boost sales`
-}
+      }
 
 Need help? Contact us by replying to the email. 
 
@@ -1205,13 +1210,25 @@ const sendAdminCommunicationMail = async ({ to, subject, html, text }) => {
   console.log('[email][admin] sendMail start', { to, subject: String(subject || '').slice(0, 60) });
   const started = Date.now();
 
-  const info = await transporter.sendMail({
+  // Race the actual send against a 38s hard timeout so we always get a clean
+  // error message instead of the platform (Render) killing the request silently.
+  const SEND_TIMEOUT_MS = 38000;
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`Email send timed out after ${SEND_TIMEOUT_MS / 1000}s`)),
+      SEND_TIMEOUT_MS
+    )
+  );
+
+  const sendPromise = transporter.sendMail({
     from: { name: cleanEnv(process.env.SMTP_FROM_NAME) || 'VettCode', address: smtpUser },
     to,
     subject,
     html,
     text: text || subject,
   });
+
+  const info = await Promise.race([sendPromise, timeoutPromise]);
 
   console.log('[email][admin] sendMail OK', { messageId: info.messageId, ms: Date.now() - started });
   return { success: true, messageId: info.messageId };
