@@ -24,6 +24,7 @@ const User = require('../models/User');
 const PushToken = require('../models/PushToken');
 const { Expo } = require('expo-server-sdk');
 const { permanentlyDeleteSeller } = require('../services/sellerDeletionService');
+const AdminSettings = require('../models/AdminSettings');
 
 const expo = new Expo();
 
@@ -33,6 +34,39 @@ const ADMIN_NAME     = process.env.ADMIN_NAME     || 'Masereka Adorable Kimulya'
 const ADMIN_PHONE    = process.env.ADMIN_PHONE    || '+256761819885';
 const ADMIN_PASSWORD = 'Hacker X1234567'; // In production, store hashed in DB
 const ADMIN_SECRET   = process.env.ADMIN_SECRET_KEY || 'eshop-admin-secret-2025-x9k2m';
+const ADMIN_ID       = 'admin-masereka-001';
+
+async function getAdminSettingsDoc() {
+  return AdminSettings.findOne({ singleton: 'main' });
+}
+
+async function getAdminProfile() {
+  const doc = await getAdminSettingsDoc();
+  return {
+    id: ADMIN_ID,
+    name: doc?.displayName?.trim() || ADMIN_NAME,
+    email: ADMIN_EMAIL,
+    phone: doc?.phone?.trim() || ADMIN_PHONE,
+    isAdmin: true,
+    role: 'admin',
+  };
+}
+
+async function verifyAdminPassword(password) {
+  const doc = await getAdminSettingsDoc();
+  if (doc?.passwordHash) {
+    return bcrypt.compare(password, doc.passwordHash);
+  }
+  return password === ADMIN_PASSWORD;
+}
+
+function getStorefrontUrl() {
+  return (
+    process.env.STOREFRONT_URL ||
+    process.env.FRONTEND_URL ||
+    'https://vettcodedev.vercel.app'
+  ).replace(/\/$/, '');
+}
 
 // â”€â”€ Admin auth middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function adminAuth(req, res, next) {
@@ -62,30 +96,24 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
 
-    if (password !== ADMIN_PASSWORD) {
+    const validPassword = await verifyAdminPassword(password);
+    if (!validPassword) {
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
+
+    const admin = await getAdminProfile();
 
     // Issue a JWT with isAdmin flag
     const token = jwt.sign(
       {
-        adminId: 'admin-masereka-001',
-        email: ADMIN_EMAIL,
-        name: ADMIN_NAME,
+        adminId: admin.id,
+        email: admin.email,
+        name: admin.name,
         isAdmin: true,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-
-    const admin = {
-      id: 'admin-masereka-001',
-      name: ADMIN_NAME,
-      email: ADMIN_EMAIL,
-      phone: ADMIN_PHONE,
-      isAdmin: true,
-      role: 'admin',
-    };
 
     console.log(`[Admin] Login successful: ${ADMIN_EMAIL}`);
 
@@ -1070,14 +1098,6 @@ const {
   sanitizeFeaturedItems,
 } = require('../services/adminEmailService');
 
-function getStorefrontUrl() {
-  return (
-    process.env.STOREFRONT_URL ||
-    process.env.FRONTEND_URL ||
-    'https://vettcodedev.vercel.app'
-  ).replace(/\/$/, '');
-}
-
 router.get('/communications/smtp-status', adminAuth, async (req, res) => {
   try {
     const configured = isSmtpConfigured();
@@ -1409,6 +1429,89 @@ router.post('/communications/users/send', adminAuth, async (req, res) => {
   } catch (err) {
     console.error('[Admin][email] POST users/send ERROR:', err.message, err.stack);
     res.status(500).json({ success: false, error: err.message || 'Failed to send emails' });
+  }
+});
+
+// ── Admin settings ─────────────────────────────────────────────────────────────
+router.get('/settings', adminAuth, async (req, res) => {
+  try {
+    const profile = await getAdminProfile();
+    const doc = await getAdminSettingsDoc();
+    const smtpConfigured = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+
+    res.json({
+      success: true,
+      profile,
+      system: {
+        storefrontUrl: getStorefrontUrl(),
+        apiBase: process.env.API_PUBLIC_URL || 'https://easyshop-d00e.onrender.com/api',
+        smtpConfigured,
+        passwordCustomized: Boolean(doc?.passwordHash),
+        adminEmailLocked: true,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin] GET settings error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load settings' });
+  }
+});
+
+router.patch('/settings/profile', adminAuth, async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const displayName = name?.trim();
+    const phoneValue = phone?.trim();
+
+    if (!displayName || displayName.length < 2) {
+      return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
+    }
+
+    if (phoneValue && phoneValue.length < 8) {
+      return res.status(400).json({ success: false, error: 'Enter a valid phone number' });
+    }
+
+    await AdminSettings.findOneAndUpdate(
+      { singleton: 'main' },
+      { displayName, phone: phoneValue || '' },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const profile = await getAdminProfile();
+    res.json({ success: true, message: 'Profile updated', profile });
+  } catch (err) {
+    console.error('[Admin] PATCH settings/profile error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
+  }
+});
+
+router.post('/settings/change-password', adminAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters' });
+    }
+
+    const valid = await verifyAdminPassword(currentPassword);
+    if (!valid) {
+      return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await AdminSettings.findOneAndUpdate(
+      { singleton: 'main' },
+      { passwordHash },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('[Admin] POST settings/change-password error:', err);
+    res.status(500).json({ success: false, error: 'Failed to change password' });
   }
 });
 
