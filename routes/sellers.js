@@ -264,6 +264,51 @@ const handleSellerRegistration = async (req, res) => {
       googleId = password.replace('google_', '');
     }
     
+    // For Google OAuth users, skip OTP and create account directly
+    if (isGoogleAuth && googleId) {
+      try {
+        // Create seller account directly for Google users
+        const newSeller = new Seller({
+          name,
+          email: email.toLowerCase(),
+          phoneNumber,
+          password, // Will be hashed by pre-save middleware
+          googleId,
+          verified: true, // Google users are pre-verified
+          status: 'pending',
+          approvalStatus: 'pending_review',
+          applicationNote: applicationNote || '',
+        });
+        
+        await newSeller.save();
+        console.log('Google OAuth seller created directly:', newSeller._id);
+        
+        // Send welcome email (optional, don't fail if it doesn't work)
+        try {
+          await sendWelcomeEmail(email, name);
+        } catch (emailError) {
+          console.log('Welcome email failed (non-critical):', emailError);
+        }
+        
+        return res.status(200).json({
+          message: 'Google account registered successfully!',
+          success: true,
+          seller: {
+            id: newSeller._id,
+            name: newSeller.name,
+            email: newSeller.email
+          }
+        });
+      } catch (error) {
+        console.error('Google OAuth seller creation error:', error);
+        return res.status(500).json({
+          message: 'Failed to create account',
+          error: 'Something went wrong. Please try again.'
+        });
+      }
+    }
+    
+    // For regular users, store OTP and send verification email
     // Store OTP with expiration (10 minutes)
     otpStorage.set(email, {
       otp: otp,
@@ -275,7 +320,7 @@ const handleSellerRegistration = async (req, res) => {
         phoneNumber, 
         password, 
         applicationNote: applicationNote || '',
-        googleId: googleId // Store Google ID if present
+        googleId: null // Regular users don't have Google ID
       }
     });
     
