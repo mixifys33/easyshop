@@ -25,6 +25,11 @@ const sellerSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  googleId: {
+    type: String,
+    trim: true,
+    sparse: true // Allows null values while maintaining uniqueness for non-null values
+  },
   verified: {
     type: Boolean,
     default: false

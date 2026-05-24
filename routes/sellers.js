@@ -223,13 +223,18 @@ const handleSellerRegistration = async (req, res) => {
       });
     }
     
-    // Validate password strength
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      return res.status(400).json({
-        message: 'Password does not meet security requirements',
-        error: passwordValidation.errors.join('. ')
-      });
+    // Skip password validation for Google OAuth users (password starts with "google_")
+    const isGoogleAuth = password.startsWith('google_');
+    
+    if (!isGoogleAuth) {
+      // Validate password strength for regular users
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({
+          message: 'Password does not meet security requirements',
+          error: passwordValidation.errors.join('. ')
+        });
+      }
     }
     
     // Check for existing seller with same email or phone
@@ -252,12 +257,26 @@ const handleSellerRegistration = async (req, res) => {
     // Generate OTP
     const otp = generateOTP();
     
+    // Extract Google ID if this is a Google OAuth registration
+    let googleId = null;
+    if (isGoogleAuth) {
+      // Password format: google_{googleId}
+      googleId = password.replace('google_', '');
+    }
+    
     // Store OTP with expiration (10 minutes)
     otpStorage.set(email, {
       otp: otp,
       expires: Date.now() + 10 * 60 * 1000, // 10 minutes
       attempts: 0,
-      sellerData: { name, email, phoneNumber, password, applicationNote: applicationNote || '' } // Store plain password, will be hashed when saving to DB
+      sellerData: { 
+        name, 
+        email, 
+        phoneNumber, 
+        password, 
+        applicationNote: applicationNote || '',
+        googleId: googleId // Store Google ID if present
+      }
     });
     
     console.log('OTP stored for email:', email, 'OTP:', otp);
@@ -347,7 +366,11 @@ router.post('/verify', async (req, res) => {
     
     // Verify OTP
     console.log('Comparing OTPs:', { received: otp, stored: storedData.otp });
-    if (storedData.otp !== otp) {
+    
+    // Special handling for Google OAuth auto-verification
+    const isGoogleAutoVerify = otp === "GOOGLE_AUTO_VERIFY";
+    
+    if (!isGoogleAutoVerify && storedData.otp !== otp) {
       storedData.attempts += 1;
       console.log('OTP mismatch, attempts now:', storedData.attempts);
       
@@ -387,6 +410,7 @@ router.post('/verify', async (req, res) => {
       email: storedData.sellerData.email,
       phoneNumber: storedData.sellerData.phoneNumber,
       password: storedData.sellerData.password, // Will be hashed by pre-save middleware
+      googleId: storedData.sellerData.googleId || null, // Store Google ID if present
       verified: true,
       status: 'pending',           // Requires admin approval before they can sell
       approvalStatus: 'pending_review',
