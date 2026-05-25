@@ -202,6 +202,28 @@ const sellerSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+  
+  // Developer Profile (for code sellers on VETTCODE)
+  isDeveloper: {
+    type: Boolean,
+    default: false
+  },
+  developerProfile: {
+    githubUrl: { type: String, default: '' },
+    portfolioUrl: { type: String, default: '' },
+    bio: { type: String, default: '' },
+    skills: [String],
+    yearsOfExperience: { type: Number, default: 0 },
+    preferredLanguages: [String]
+  },
+  preListedCodesCount: {
+    type: Number,
+    default: 0
+  },
+  notifyOnLaunch: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true
