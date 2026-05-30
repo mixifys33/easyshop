@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const PreListedCode = require("../models/PreListedCode");
 const Seller = require("../models/Seller");
-const auth = require("../middleware/auth");
+const { auth } = require("../middleware/auth");
 const multer = require("multer");
 
 // Configure multer for file uploads (memory storage)
