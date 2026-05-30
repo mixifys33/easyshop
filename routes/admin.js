@@ -134,7 +134,6 @@ router.post('/login', async (req, res) => {
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
     const Order = require('../models/Order');
-    const Product = require('../models/Product');
     const Application = require('../models/Application');
 
     const [
@@ -143,7 +142,6 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       activeSellers,
       suspendedSellers,
       totalUsers,
-      totalProducts,
       totalOrders,
       totalApplications,
       pendingApplications,
@@ -155,7 +153,6 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       Seller.countDocuments({ status: 'active' }),
       Seller.countDocuments({ status: 'suspended' }),
       User.countDocuments({}),
-      Product.countDocuments({}),
       Order.countDocuments({}),
       Application.countDocuments({ isDraft: false }),
       Application.countDocuments({ isDraft: false, verificationStatus: 'pending' }),
@@ -533,27 +530,27 @@ router.get('/orders', adminAuth, async (req, res) => {
 // â”€â”€ GET /api/admin/products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/products', adminAuth, async (req, res) => {
   try {
-    const Product = require('../models/Product');
+    const Application = require('../models/Application');
     const { page = 1, limit = 200, search = '' } = req.query;
     const lim = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 500);
-    const query = {};
+    const query = { isDraft: false };
     if (search.trim()) {
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { appName: { $regex: search, $options: 'i' } },
+        { shortDescription: { $regex: search, $options: 'i' } },
+        { appCategory: { $regex: search, $options: 'i' } },
       ];
     }
 
-    const products = await Product.find(query)
+    const applications = await Application.find(query)
       .populate('sellerId', 'name email shop.shopName')
       .sort({ createdAt: -1 })
       .skip((Math.max(parseInt(page, 10), 1) - 1) * lim)
       .limit(lim)
       .lean();
 
-    const total = await Product.countDocuments(query);
-    res.json({ success: true, products, total });
+    const total = await Application.countDocuments(query);
+    res.json({ success: true, products: applications, total });
   } catch (err) {
     console.error('[Admin] Get products error:', err);
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -1158,7 +1155,6 @@ router.get('/communications/sellers/recipients', adminAuth, async (req, res) => 
 router.get('/communications/email-catalog', adminAuth, async (req, res) => {
   try {
     const Application = require('../models/Application');
-    const Product = require('../models/Product');
     const { search = '', limit = 30 } = req.query;
     const lim = Math.min(Math.max(Number(limit) || 30, 1), 50);
     const storefront = getStorefrontUrl();
@@ -1180,20 +1176,6 @@ router.get('/communications/email-catalog', adminAuth, async (req, res) => {
       .select('appName shortDescription price currency isFree appIcon screenshots appCategory')
       .sort({ publishedAt: -1, createdAt: -1 })
       .limit(lim)
-      .lean();
-
-    const prodQuery = {};
-    if (search.trim()) {
-      prodQuery.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
-    }
-
-    const products = await Product.find(prodQuery)
-      .select('title description salePrice currency images category')
-      .sort({ createdAt: -1 })
-      .limit(Math.min(lim, 20))
       .lean();
 
     const items = [

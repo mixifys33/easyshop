@@ -2,9 +2,8 @@
 const fetch = require('node-fetch');
 const router = express.Router();
 const mongoose = require('mongoose');
-const Product = require('../models/Product');
+const Application = require('../models/Application');
 const Campaign = require('../models/Campaign');
-const DeliveryTerminal = require('../models/DeliveryTerminal');
 const Seller = require('../models/Seller');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -62,7 +61,7 @@ function prepareMessages(messages, model) {
 }
 
 // â”€â”€ Safe field selectors â€” no passwords, tokens, payment credentials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const PRODUCT_SELECT = 'title regularPrice salePrice category subCategory brand stock description cashOnDelivery images sellerId warranty tags colors sizes customSpecs deliveryFee freeDelivery featured';
+const APPLICATION_SELECT = 'title regularPrice salePrice category subCategory brand stock description cashOnDelivery images sellerId warranty tags colors sizes customSpecs deliveryFee freeDelivery featured';
 const SELLER_PUBLIC_SELECT = 'shop.shopName shop.shopDescription shop.businessType shop.city shop.isSetup verified metrics delivery.offersDelivery delivery.offersPickup delivery.freeDeliveryThreshold delivery.processingDays delivery.zones delivery.notes';
 
 // â”€â”€ Call AI with model fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -128,20 +127,20 @@ async function fetchProducts(query, limit, priceFilter) {
     : { stock: -1, createdAt: -1 };
 
   if (!query || !query.trim()) {
-    return Product.find(Object.assign({}, base, { stock: { $gt: 0 } }))
-      .select(PRODUCT_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
+    return Application.find(Object.assign({}, base, { stock: { $gt: 0 } }))
+      .select(APPLICATION_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
       .sort(sortOrder).limit(limit).lean();
   }
 
   var q = query.trim();
 
   // Title-exact matches first (highest relevance)
-  var exact = await Product.find(Object.assign({}, base, { title: { $regex: q, $options: 'i' } }))
-    .select(PRODUCT_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
+  var exact = await Application.find(Object.assign({}, base, { title: { $regex: q, $options: 'i' } }))
+    .select(APPLICATION_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
     .sort(sortOrder).limit(Math.ceil(limit / 2)).lean();
 
   // Broad search across all fields
-  var broad = await Product.find(Object.assign({}, base, {
+  var broad = await Application.find(Object.assign({}, base, {
     $or: [
       { title: { $regex: q, $options: 'i' } },
       { category: { $regex: q, $options: 'i' } },
@@ -150,7 +149,7 @@ async function fetchProducts(query, limit, priceFilter) {
       { tags: { $regex: q, $options: 'i' } },
       { subCategory: { $regex: q, $options: 'i' } },
     ],
-  })).select(PRODUCT_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
+  })).select(APPLICATION_SELECT).populate('sellerId', SELLER_PUBLIC_SELECT)
     .sort(sortOrder).limit(limit).lean();
 
   // Deduplicate, exact matches first
@@ -203,13 +202,12 @@ async function fetchActiveCampaigns() {
 }
 
 async function fetchCategories() {
-  return Product.distinct('category', { status: 'active', isDraft: { $ne: true } });
+  return Application.distinct('category', { status: 'active', isDraft: { $ne: true } });
 }
 
 async function fetchDeliveryTerminals() {
-  return DeliveryTerminal.find({ active: true })
-    .select('name company region district city address phone type')
-    .sort({ region: 1, city: 1 }).lean();
+  // Delivery terminals not available for software applications
+  return [];
 }
 
 // â”€â”€ Format helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -311,7 +309,7 @@ async function formatCampaignForAI(c) {
 
   var appliesInfo = '';
   if (c.appliesTo === 'specific_products' && c.productIds && c.productIds.length) {
-    var products = await Product.find({ _id: { $in: c.productIds }, status: 'active' })
+    var products = await Application.find({ _id: { $in: c.productIds }, status: 'active' })
       .select('title salePrice').limit(5).lean();
     if (products.length) {
       appliesInfo = ' | Applies to: ' + products.map(function(p) { return p.title; }).join(', ');

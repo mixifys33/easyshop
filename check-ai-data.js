@@ -1,28 +1,25 @@
 require('dotenv').config();
 const connectDB = require('./config/database');
-const Product = require('./models/Product');
+const Application = require('./models/Application');
 const Campaign = require('./models/Campaign');
-const DeliveryTerminal = require('./models/DeliveryTerminal');
 
 connectDB().then(async () => {
-  const pCount = await Product.countDocuments({ status: 'active', isDraft: { $ne: true } });
+  const pCount = await Application.countDocuments({ status: 'active', isDraft: { $ne: true } });
   const cCount = await Campaign.countDocuments({ status: 'active' });
-  const tCount = await DeliveryTerminal.countDocuments({ active: true });
-  const cats = await Product.distinct('category', { status: 'active', isDraft: { $ne: true } });
+  const cats = await Application.distinct('category', { status: 'active', isDraft: { $ne: true } });
 
-  console.log('Products (active):', pCount);
+  console.log('Applications (active):', pCount);
   console.log('Campaigns (active):', cCount);
-  console.log('Terminals (active):', tCount);
   console.log('Categories:', cats);
 
   if (pCount > 0) {
-    const sample = await Product.findOne({ status: 'active' }).select('title salePrice category').lean();
-    console.log('Sample product:', JSON.stringify(sample));
+    const sample = await Application.findOne({ status: 'active' }).select('title salePrice category').lean();
+    console.log('Sample application:', JSON.stringify(sample));
   }
 
-  // Test the fetchProducts logic directly
+  // Test the fetchApplications logic directly
   const q = 'phone';
-  const results = await Product.find({
+  const results = await Application.find({
     status: 'active',
     isDraft: { $ne: true },
     $or: [

@@ -1973,8 +1973,8 @@ router.put('/payment/:sellerId', async (req, res) => {
 
     if (!seller) return res.status(404).json({ success: false, message: 'Seller not found' });
 
-    // Sync payment methods to ALL seller's products
-    const Product = require('../models/Product');
+    // Sync payment methods to ALL seller's applications
+    const Application = require('../models/Application');
     const paymentSync = {
       'paymentMethods.mtnName': mtnName || '',
       'paymentMethods.mtnNumber': mtnNumber || '',
@@ -1987,7 +1987,7 @@ router.put('/payment/:sellerId', async (req, res) => {
       'paymentMethods.preferredMethod': preferredMethod || '',
     };
 
-    const syncResult = await Product.updateMany(
+    const syncResult = await Application.updateMany(
       { sellerId: req.params.sellerId },
       { $set: paymentSync }
     );

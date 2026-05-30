@@ -4,7 +4,6 @@
 const mongoose = require('mongoose');
 const Seller = require('../models/Seller');
 const Application = require('../models/Application');
-const Product = require('../models/Product');
 const Campaign = require('../models/Campaign');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');

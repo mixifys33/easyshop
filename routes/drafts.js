@@ -1,5 +1,5 @@
 const express = require('express');
-const Product = require('../models/Product');
+const Application = require('../models/Application');
 const router = express.Router();
 
 // POST /api/products/draft - Save product as draft
