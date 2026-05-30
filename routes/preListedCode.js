@@ -12,15 +12,14 @@ const upload = multer({
 });
 
 // POST /api/pre-listed-code/submit
-// Submit a scanned codebase for pre-listing with complete product information
+// Submit a scanned codebase for pre-listing with complete application information
 router.post("/submit", auth, upload.fields([
   { name: "codeZip", maxCount: 1 },
-  { name: "images", maxCount: 5 }
+  { name: "screenshots", maxCount: 5 },
+  { name: "appIcon", maxCount: 1 }
 ]), async (req, res) => {
   try {
     const {
-      projectName,
-      projectDescription,
       detailedDescription,
       vettScore,
       vettGrade,
@@ -31,30 +30,34 @@ router.post("/submit", auth, upload.fields([
       frameworks,
       hasTests,
       hasDocumentation,
-      category,
-      subCategory,
+      appName,
+      shortDescription,
       tags,
-      regularPrice,
-      salePrice,
+      appCategory,
+      technologyStack,
+      price,
+      currency,
+      isFree,
       licenseType,
-      demoUrl,
+      liveDemo,
+      githubRepo,
       documentationUrl,
-      videoUrl,
-      features,
+      videoDemo,
+      supportedPlatforms,
+      dependencies,
+      commercialUse,
+      resaleRights,
+      supportLevel,
+      updateFrequency,
+      warranty,
+      installationSupport,
     } = req.body;
 
     // Validate required fields
-    if (!projectName || !vettScore || !vettGrade || !scanReport) {
+    if (!appName || !shortDescription || !appCategory || !vettScore || !vettGrade || !scanReport) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: projectName, vettScore, vettGrade, scanReport",
-      });
-    }
-
-    if (!category || !subCategory || !regularPrice || !salePrice) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required product fields: category, subCategory, regularPrice, salePrice",
+        message: "Missing required fields: appName, shortDescription, appCategory, vettScore, vettGrade, scanReport",
       });
     }
 
@@ -70,7 +73,8 @@ router.post("/submit", auth, upload.fields([
     let codeZipUrl = "";
     let codeZipFileId = "";
     let codeSize = 0;
-    const uploadedImages = [];
+    const uploadedScreenshots = [];
+    let uploadedAppIcon = null;
 
     // Initialize ImageKit
     const ImageKit = require("imagekit");
@@ -86,7 +90,7 @@ router.post("/submit", auth, upload.fields([
         const zipFile = req.files.codeZip[0];
         const uploadResult = await imagekit.upload({
           file: zipFile.buffer.toString("base64"),
-          fileName: `${seller._id}_${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.zip`,
+          fileName: `${seller._id}_${appName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.zip`,
           folder: "/vettcode/pre-listed-codes",
           useUniqueFileName: true,
         });
@@ -100,27 +104,52 @@ router.post("/submit", auth, upload.fields([
       }
     }
 
-    // Upload product images to ImageKit
-    if (req.files && req.files.images) {
-      for (const imageFile of req.files.images) {
+    // Upload screenshots to ImageKit
+    if (req.files && req.files.screenshots) {
+      for (const imageFile of req.files.screenshots) {
         try {
           const uploadResult = await imagekit.upload({
             file: imageFile.buffer.toString("base64"),
-            fileName: `${seller._id}_${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${imageFile.originalname}`,
+            fileName: `${seller._id}_${appName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${imageFile.originalname}`,
             folder: `/vettcode/pre-listed/${seller._id}`,
             useUniqueFileName: true,
           });
 
-          uploadedImages.push({
+          uploadedScreenshots.push({
             url: uploadResult.url,
             fileId: uploadResult.fileId,
             thumbnailUrl: uploadResult.thumbnailUrl || uploadResult.url,
             fileName: uploadResult.name,
+            uploaded: true,
           });
         } catch (uploadError) {
-          console.error("ImageKit image upload error:", uploadError);
-          // Continue with other images
+          console.error("ImageKit screenshot upload error:", uploadError);
+          // Continue with other screenshots
         }
+      }
+    }
+
+    // Upload app icon to ImageKit
+    if (req.files && req.files.appIcon && req.files.appIcon[0]) {
+      try {
+        const iconFile = req.files.appIcon[0];
+        const uploadResult = await imagekit.upload({
+          file: iconFile.buffer.toString("base64"),
+          fileName: `${seller._id}_${appName.replace(/[^a-zA-Z0-9]/g, '_')}_icon_${Date.now()}_${iconFile.originalname}`,
+          folder: `/vettcode/app-icons/${seller._id}`,
+          useUniqueFileName: true,
+        });
+
+        uploadedAppIcon = {
+          url: uploadResult.url,
+          fileId: uploadResult.fileId,
+          thumbnailUrl: uploadResult.thumbnailUrl || uploadResult.url,
+          fileName: uploadResult.name,
+          uploaded: true,
+        };
+      } catch (uploadError) {
+        console.error("ImageKit app icon upload error:", uploadError);
+        // Continue without app icon - not critical
       }
     }
 
@@ -129,15 +158,15 @@ router.post("/submit", auth, upload.fields([
     const parsedFileTree = fileTree ? (typeof fileTree === "string" ? JSON.parse(fileTree) : fileTree) : null;
     const parsedLanguages = Array.isArray(languages) ? languages : JSON.parse(languages || "[]");
     const parsedFrameworks = Array.isArray(frameworks) ? frameworks : JSON.parse(frameworks || "[]");
-    const parsedFeatures = Array.isArray(features) ? features : JSON.parse(features || "[]");
+    const parsedTechnologyStack = Array.isArray(technologyStack) ? technologyStack : JSON.parse(technologyStack || "[]");
+    const parsedSupportedPlatforms = Array.isArray(supportedPlatforms) ? supportedPlatforms : JSON.parse(supportedPlatforms || "[]");
+    const parsedDependencies = Array.isArray(dependencies) ? dependencies : JSON.parse(dependencies || "[]");
 
     // Create pre-listed code entry
     const preListedCode = new PreListedCode({
       developerId: seller._id,
       developerEmail: seller.email,
       developerName: seller.name,
-      projectName,
-      projectDescription: projectDescription || "",
       detailedDescription: detailedDescription || "",
       vettScore: parseFloat(vettScore),
       vettGrade,
@@ -151,18 +180,32 @@ router.post("/submit", auth, upload.fields([
       frameworks: parsedFrameworks,
       hasTests: hasTests === "true" || hasTests === true,
       hasDocumentation: hasDocumentation === "true" || hasDocumentation === true,
-      category,
-      subCategory,
+
+      // Application model fields
+      appName,
+      shortDescription,
       tags: tags || "",
-      regularPrice: parseFloat(regularPrice),
-      salePrice: parseFloat(salePrice),
-      currency: "USD",
-      licenseType: licenseType || "Commercial",
-      images: uploadedImages,
-      demoUrl: demoUrl || "",
+      appCategory,
+      technologyStack: parsedTechnologyStack,
+      price: parseFloat(price) || 0,
+      currency: currency || "USD",
+      isFree: isFree === "true" || isFree === true,
+      licenseType: licenseType || "MIT License",
+      liveDemo: liveDemo || "",
+      githubRepo: githubRepo || "",
       documentationUrl: documentationUrl || "",
-      videoUrl: videoUrl || "",
-      features: parsedFeatures,
+      videoDemo: videoDemo || "",
+      supportedPlatforms: parsedSupportedPlatforms,
+      dependencies: parsedDependencies,
+      commercialUse: commercialUse || "Yes",
+      resaleRights: resaleRights || "No",
+      supportLevel: supportLevel || "Community",
+      updateFrequency: updateFrequency || "Active",
+      warranty: warranty || "30 days",
+      installationSupport: installationSupport || "Yes",
+      screenshots: uploadedScreenshots,
+      appIcon: uploadedAppIcon,
+
       status: "pending_review",
     });
 
@@ -174,8 +217,8 @@ router.post("/submit", auth, upload.fields([
       seller.developerProfile = {
         bio: `Developer with ${parsedLanguages.length} languages and ${parsedFrameworks.length} frameworks`,
         skills: [...parsedLanguages, ...parsedFrameworks],
-        githubUrl: "",
-        portfolioUrl: "",
+        githubUrl: githubRepo || "",
+        portfolioUrl: liveDemo || "",
       };
     }
     seller.preListedCodesCount = (seller.preListedCodesCount || 0) + 1;
@@ -186,11 +229,11 @@ router.post("/submit", auth, upload.fields([
       message: "Code successfully pre-listed! You'll be notified when the platform launches.",
       data: {
         id: preListedCode._id,
-        projectName: preListedCode.projectName,
+        appName: preListedCode.appName,
         vettScore: preListedCode.vettScore,
         vettGrade: preListedCode.vettGrade,
         preListedAt: preListedCode.preListedAt,
-        imagesUploaded: uploadedImages.length,
+        screenshotsUploaded: uploadedScreenshots.length,
       },
     });
   } catch (error) {
@@ -256,53 +299,6 @@ router.get("/:id", auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch code details",
-      error: error.message,
-    });
-  }
-});
-
-// PATCH /api/pre-listed-code/:id/update-price
-// Seller updates suggested price for their pre-listed code
-router.patch("/:id/update-price", auth, async (req, res) => {
-  try {
-    const { suggestedPrice } = req.body;
-
-    if (suggestedPrice == null || suggestedPrice < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid price. Must be a positive number.",
-      });
-    }
-
-    const code = await PreListedCode.findById(req.params.id);
-
-    if (!code) {
-      return res.status(404).json({
-        success: false,
-        message: "Pre-listed code not found",
-      });
-    }
-
-    if (code.developerId.toString() !== req.userId) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    code.suggestedPrice = suggestedPrice;
-    await code.save();
-
-    res.json({
-      success: true,
-      message: "Price updated successfully",
-      data: { suggestedPrice: code.suggestedPrice },
-    });
-  } catch (error) {
-    console.error("Update price error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update price",
       error: error.message,
     });
   }

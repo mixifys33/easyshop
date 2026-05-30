@@ -18,16 +18,7 @@ const preListedCodeSchema = new mongoose.Schema({
     required: true
   },
   
-  // Codebase Information
-  projectName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  projectDescription: {
-    type: String,
-    default: ''
-  },
+  // Codebase Information (using Application model fields)
   detailedDescription: {
     type: String,
     default: ''
@@ -84,77 +75,141 @@ const preListedCodeSchema = new mongoose.Schema({
     default: false
   },
   
-  // Product Information (for final listing)
-  category: {
+  // Application Information (matching Application model)
+  appName: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
-  subCategory: {
+  shortDescription: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   tags: {
     type: String,
-    default: ''
+    trim: true
   },
-  
+  appCategory: {
+    type: String,
+    required: true,
+    enum: [
+      'Web Application',
+      'Mobile App (React Native)',
+      'Mobile App (Native iOS)',
+      'Mobile App (Native Android)',
+      'Desktop Application',
+      'API/Backend Service',
+      'Chrome Extension',
+      'WordPress Plugin',
+      'NPM Package/Library',
+      'CLI Tool',
+      'Game',
+      'E-commerce Solution',
+      'CMS/Blog Platform',
+      'Dashboard/Admin Panel',
+      'Other'
+    ]
+  },
+  technologyStack: [{
+    type: String,
+    trim: true
+  }],
+
+  // URLs & Links
+  liveDemo: {
+    type: String,
+    trim: true
+  },
+  githubRepo: {
+    type: String,
+    trim: true
+  },
+  documentationUrl: {
+    type: String,
+    trim: true
+  },
+  videoDemo: {
+    type: String,
+    trim: true
+  },
+
+  // Visual Assets
+  screenshots: [{
+    url: String,
+    fileId: String,
+    thumbnailUrl: String,
+    fileName: String,
+    uploaded: Boolean
+  }],
+  appIcon: {
+    url: String,
+    fileId: String,
+    thumbnailUrl: String,
+    fileName: String,
+    uploaded: Boolean
+  },
+
   // Pricing
-  regularPrice: {
+  price: {
     type: Number,
-    required: true,
-    min: 0
-  },
-  salePrice: {
-    type: Number,
-    required: true,
+    default: 0,
     min: 0
   },
   currency: {
     type: String,
-    default: 'USD'
+    default: 'USD',
+    enum: ['USD', 'EUR', 'GBP', 'UGX', 'KES', 'TZS', 'RWF']
   },
-  
-  // License & Usage
+  isFree: {
+    type: Boolean,
+    default: false
+  },
   licenseType: {
     type: String,
-    enum: ['MIT', 'Apache 2.0', 'GPL', 'Commercial', 'Proprietary', 'Other'],
-    default: 'Commercial'
+    default: 'MIT License'
   },
-  
-  // Media
-  images: [{
-    url: {
-      type: String,
-      default: ''
-    },
-    fileId: {
-      type: String,
-      default: ''
-    },
-    thumbnailUrl: {
-      type: String,
-      default: ''
-    },
-    fileName: {
-      type: String,
-      default: ''
-    }
+
+  // Platform & Dependencies
+  supportedPlatforms: [{
+    type: String,
+    trim: true
   }],
-  demoUrl: {
+  dependencies: [{
     type: String,
-    default: ''
-  },
-  documentationUrl: {
+    trim: true
+  }],
+
+  // Commercial Terms
+  commercialUse: {
     type: String,
-    default: ''
+    default: 'Yes',
+    enum: ['Yes', 'No', 'With License']
   },
-  videoUrl: {
+  resaleRights: {
     type: String,
-    default: ''
+    default: 'No',
+    enum: ['Yes', 'No', 'With License']
   },
-  
-  // Features
-  features: [String], // Key features list
+  supportLevel: {
+    type: String,
+    default: 'Community',
+    enum: ['Community', 'Email', 'Priority', 'Enterprise']
+  },
+  updateFrequency: {
+    type: String,
+    default: 'Active',
+    enum: ['Active', 'Maintenance', 'Deprecated']
+  },
+  warranty: {
+    type: String,
+    default: '30 days'
+  },
+  installationSupport: {
+    type: String,
+    default: 'Yes',
+    enum: ['Yes', 'No', 'Paid']
+  },
   
   // Pre-List Status
   status: {

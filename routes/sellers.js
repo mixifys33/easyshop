@@ -695,9 +695,18 @@ router.post('/login', async (req, res) => {
     
     console.log(`✅ Login successful for: ${email}`);
     
+    // Generate JWT token
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      { userId: seller._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
     res.status(200).json({
       message: 'Login successful',
       success: true,
+      token,
       seller: {
         id: seller._id,
         name: seller.name,
