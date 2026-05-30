@@ -4,7 +4,7 @@ const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const Product = require('../models/Product');
+const Application = require('../models/Application');
 const Campaign = require('../models/Campaign');
 const router = express.Router();
 
@@ -80,7 +80,7 @@ const upload = multer({
 
 // Get all products (public)
 // Helper: normalize a product document to the shape the frontend card expects
-const normalizeProduct = (p) => {
+const normalizeApplication = (p) => {
   const obj = p.toObject ? p.toObject() : { ...p };
   const seller = obj.sellerId;
   return {
@@ -137,9 +137,9 @@ router.get('/', async (req, res) => {
     const sortDir = sortOrder === 'asc' ? 1 : -1;
 
     const skip = (Number(page) - 1) * Number(limit);
-    const total = await Product.countDocuments(filter);
+    const total = await Application.countDocuments(filter);
 
-    const products = await Product.find(filter)
+    const products = await Application.find(filter)
       .populate('sellerId', 'shop.shopName shopName email phoneNumber verified')
       .sort({ [sortField]: sortDir })
       .skip(skip)
@@ -150,7 +150,7 @@ router.get('/', async (req, res) => {
 
     const enriched = products.map(p => {
       const withCampaign = attachCampaign(p, campaigns);
-      return normalizeProduct(withCampaign);
+      return normalizeApplication(withCampaign);
     });
 
     res.json({
@@ -170,7 +170,7 @@ router.get('/', async (req, res) => {
 // Get latest product updatedAt timestamp (used by frontend cache invalidation)
 router.get('/latest-update', async (req, res) => {
   try {
-    const latest = await Product.findOne({ status: 'active' })
+    const latest = await Application.findOne({ status: 'active' })
       .sort({ updatedAt: -1 })
       .select('updatedAt')
       .lean();
@@ -183,8 +183,8 @@ router.get('/latest-update', async (req, res) => {
 // Get categories (with subCategories grouped)
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await Product.distinct('category', { status: 'active' });
-    const subCategoryDocs = await Product.aggregate([
+    const categories = await Application.distinct('category', { status: 'active' });
+    const subCategoryDocs = await Application.aggregate([
       { $match: { status: 'active' } },
       { $group: { _id: { category: '$category', subCategory: '$subCategory' } } },
     ]);
@@ -217,7 +217,7 @@ router.get('/recommendations', async (req, res) => {
       if (ids.length) filter._id = { $nin: ids };
     }
 
-    const products = await Product.find(filter)
+    const products = await Application.find(filter)
       .select('title slug salePrice regularPrice images category ratings _id')
       .sort({ ratings: -1, createdAt: -1 })
       .limit(Math.min(parseInt(limit) || 8, 20))
@@ -244,16 +244,16 @@ router.get('/recommendations', async (req, res) => {
 // Get single product
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
+    const product = await Application.findById(req.params.id)
       .populate('sellerId', 'shop.shopName shopName email phoneNumber verified');
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product) return res.status(404).json({ success: false, message: 'Application not found' });
 
     const now = new Date();
     const campaigns = await Campaign.find({
       sellerId: product.sellerId?._id || product.sellerId,
       status: 'active', startDate: { $lte: now }, endDate: { $gte: now },
     });
-    const enriched = normalizeProduct(attachCampaign(product, campaigns));
+    const enriched = normalizeApplication(attachCampaign(product, campaigns));
 
     res.json({ success: true, product: enriched });
   } catch (error) {
@@ -278,7 +278,7 @@ router.post('/', async (req, res) => {
       console.log('❌ Payload too large:', payloadSize);
       return res.status(400).json({
         success: false,
-        message: 'Product data is too large. Please ensure images are uploaded to ImageKit first.',
+        message: 'Application data is too large. Please ensure images are uploaded to ImageKit first.',
         error: 'Payload exceeds size limit'
       });
     }
@@ -298,7 +298,7 @@ router.post('/', async (req, res) => {
       }
     }
     
-    console.log('📋 Product data summary:', {
+    console.log('📋 Application data summary:', {
       title: productData.title,
       category: productData.category,
       imagesCount: productData.images?.length || 0,
@@ -363,7 +363,7 @@ router.post('/', async (req, res) => {
       });
     });
 
-    const product = new Product({
+    const product = new Application({
       ...productData,
       status: 'active',
       isDraft: false
@@ -388,12 +388,12 @@ router.post('/', async (req, res) => {
       }
     } catch (e) { console.log('Could not inherit payment methods:', e.message); }
     
-    console.log('📦 Product object created, saving to database...');
+    console.log('📦 Application object created, saving to database...');
     
     // Debug: Log the product object before saving
-    console.log('🔍 Product object images before save:');
+    console.log('🔍 Application object images before save:');
     product.images.forEach((img, index) => {
-      console.log(`Product Image ${index + 1}:`, {
+      console.log(`Application Image ${index + 1}:`, {
         url: img.url,
         fileId: img.fileId,
         thumbnailUrl: img.thumbnailUrl,
@@ -402,13 +402,13 @@ router.post('/', async (req, res) => {
       });
     });
     
-    const savedProduct = await product.save();
+    const savedApplication = await product.save();
     
-    console.log('✅ Product created successfully:', savedProduct._id);
+    console.log('✅ Application created successfully:', savedApplication._id);
     
     // Debug: Log the saved product images
     console.log('🔍 Saved product images in database:');
-    savedProduct.images.forEach((img, index) => {
+    savedApplication.images.forEach((img, index) => {
       console.log(`Saved Image ${index + 1}:`, {
         url: img.url,
         fileId: img.fileId,
@@ -421,8 +421,8 @@ router.post('/', async (req, res) => {
     
     res.status(201).json({
       success: true,
-      message: 'Product created successfully',
-      product: savedProduct
+      message: 'Application created successfully',
+      product: savedApplication
     });
   } catch (error) {
     console.error('❌ Error creating product:', error);
@@ -438,7 +438,7 @@ router.post('/', async (req, res) => {
       
       return res.status(400).json({ 
         success: false,
-        message: `Product validation failed: ${validationErrors.join(', ')}`,
+        message: `Application validation failed: ${validationErrors.join(', ')}`,
         errors: error.errors
       });
     }
@@ -472,7 +472,7 @@ router.post('/draft', async (req, res) => {
       });
     }
 
-    const draft = new Product({
+    const draft = new Application({
       ...draftData,
       status: 'draft',
       isDraft: true
@@ -503,7 +503,7 @@ router.get('/seller/:sellerId', async (req, res) => {
     const { sellerId } = req.params;
     const { status = 'active' } = req.query;
     
-    const products = await Product.find({ 
+    const products = await Application.find({ 
       sellerId,
       status 
     }).sort({ createdAt: -1 });
@@ -526,7 +526,7 @@ router.get('/seller/:sellerId', async (req, res) => {
 // Update product
 router.put('/:id', async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
+    const product = await Application.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
@@ -535,13 +535,13 @@ router.put('/:id', async (req, res) => {
     if (!product) {
       return res.status(404).json({ 
         success: false,
-        message: 'Product not found' 
+        message: 'Application not found' 
       });
     }
     
     res.json({
       success: true,
-      message: 'Product updated successfully',
+      message: 'Application updated successfully',
       product
     });
   } catch (error) {
@@ -560,17 +560,17 @@ router.delete('/:id', async (req, res) => {
     console.log('🗑️ Delete product request for ID:', req.params.id);
     
     // First, find the product to get its details before deletion
-    const product = await Product.findById(req.params.id);
+    const product = await Application.findById(req.params.id);
     
     if (!product) {
-      console.log('❌ Product not found for deletion:', req.params.id);
+      console.log('❌ Application not found for deletion:', req.params.id);
       return res.status(404).json({ 
         success: false,
-        message: 'Product not found' 
+        message: 'Application not found' 
       });
     }
     
-    console.log('📋 Product to delete:', {
+    console.log('📋 Application to delete:', {
       id: product._id,
       title: product.title,
       sellerId: product.sellerId,
@@ -589,14 +589,14 @@ router.delete('/:id', async (req, res) => {
     }
     
     // Delete the product from database
-    await Product.findByIdAndDelete(req.params.id);
+    await Application.findByIdAndDelete(req.params.id);
     
-    console.log('✅ Product deleted successfully from database:', product.title);
+    console.log('✅ Application deleted successfully from database:', product.title);
     
     res.json({ 
       success: true,
-      message: 'Product deleted successfully',
-      deletedProduct: {
+      message: 'Application deleted successfully',
+      deletedApplication: {
         id: product._id,
         title: product.title,
         imagesCount: product.images?.length || 0
@@ -617,7 +617,7 @@ router.get('/stats/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
     
-    const stats = await Product.aggregate([
+    const stats = await Application.aggregate([
       { $match: { sellerId: new mongoose.Types.ObjectId(sellerId) } },
       {
         $group: {
@@ -628,12 +628,12 @@ router.get('/stats/:sellerId', async (req, res) => {
       }
     ]);
     
-    const totalProducts = await Product.countDocuments({ sellerId });
+    const totalApplications = await Application.countDocuments({ sellerId });
     
     res.json({
       success: true,
       stats: {
-        total: totalProducts,
+        total: totalApplications,
         byStatus: stats,
         totalValue: stats.reduce((sum, stat) => sum + stat.totalValue, 0)
       }
@@ -869,7 +869,7 @@ router.post('/bulk-upload/process', authenticateSeller, async (req, res) => {
         }
 
         // Create new product with authenticated seller ID
-        const product = new Product({
+        const product = new Application({
           title: productData.title,
           description: productData.description || '',
           detailedDescription: productData.detailedDescription || '',
@@ -918,13 +918,13 @@ router.post('/bulk-upload/process', authenticateSeller, async (req, res) => {
         await product.save();
         results.success++;
         
-        console.log(`Product ${i + 1} saved: ${product.title} (Seller: ${req.seller.name})`);
+        console.log(`Application ${i + 1} saved: ${product.title} (Seller: ${req.seller.name})`);
         
       } catch (error) {
         console.error(`Error saving product ${i + 1}:`, error);
         results.failed++;
         results.errors.push({
-          product: productData.title || `Product ${i + 1}`,
+          product: productData.title || `Application ${i + 1}`,
           error: error.message
         });
       }
@@ -970,11 +970,11 @@ router.get('/bulk-upload/template/:type', async (req, res) => {
     
     // Create a new workbook
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Products');
+    const worksheet = workbook.addWorksheet('Applications');
     
     // Define the columns
     const columns = [
-      { header: 'Product Name', key: 'title', width: 30 },
+      { header: 'Application Name', key: 'title', width: 30 },
       { header: 'SKU', key: 'sku', width: 15 },
       { header: 'Short Description', key: 'description', width: 40 },
       { header: 'Detailed Description', key: 'detailedDescription', width: 50 },
@@ -1024,7 +1024,7 @@ router.get('/bulk-upload/template/:type', async (req, res) => {
       // For now, add sample data
       const sampleData = [
         {
-          title: 'Sample Product 1',
+          title: 'Sample Application 1',
           sku: 'SKU001',
           description: 'This is a sample product description',
           detailedDescription: 'This is a detailed description of the sample product with more information about features and benefits.',
@@ -1044,7 +1044,7 @@ router.get('/bulk-upload/template/:type', async (req, res) => {
           currency: 'UGX'
         },
         {
-          title: 'Sample Product 2',
+          title: 'Sample Application 2',
           sku: 'SKU002',
           description: 'Another sample product',
           detailedDescription: 'Detailed description for the second sample product.',
@@ -1137,7 +1137,7 @@ router.get('/bulk-upload/history', async (req, res) => {
       {
         id: '1',
         fileName: 'products_import_2024.xlsx',
-        totalProducts: 150,
+        totalApplications: 150,
         importedCount: 145,
         failedCount: 5,
         status: 'completed',
@@ -1147,7 +1147,7 @@ router.get('/bulk-upload/history', async (req, res) => {
       {
         id: '2',
         fileName: 'electronics_batch.csv',
-        totalProducts: 75,
+        totalApplications: 75,
         importedCount: 60,
         failedCount: 15,
         status: 'partial',
@@ -1217,7 +1217,7 @@ router.post('/bulk-edit', async (req, res) => {
           updateQuery.salePrice = value;
         } else {
           // For increase/decrease, we need to update each product individually
-          const products = await Product.find({ _id: { $in: productIds } });
+          const products = await Application.find({ _id: { $in: productIds } });
           
           for (const product of products) {
             let newPrice = product.salePrice || 0;
@@ -1236,7 +1236,7 @@ router.post('/bulk-edit', async (req, res) => {
               }
             }
             
-            await Product.findByIdAndUpdate(product._id, { salePrice: Math.max(0, newPrice) });
+            await Application.findByIdAndUpdate(product._id, { salePrice: Math.max(0, newPrice) });
             successCount++;
           }
           
@@ -1251,7 +1251,7 @@ router.post('/bulk-edit', async (req, res) => {
         if (actionType === 'set') {
           updateQuery.stock = value;
         } else {
-          const products = await Product.find({ _id: { $in: productIds } });
+          const products = await Application.find({ _id: { $in: productIds } });
           
           for (const product of products) {
             let newStock = product.stock || 0;
@@ -1262,7 +1262,7 @@ router.post('/bulk-edit', async (req, res) => {
               newStock -= value;
             }
             
-            await Product.findByIdAndUpdate(product._id, { stock: Math.max(0, newStock) });
+            await Application.findByIdAndUpdate(product._id, { stock: Math.max(0, newStock) });
             successCount++;
           }
           
@@ -1278,7 +1278,7 @@ router.post('/bulk-edit', async (req, res) => {
         break;
 
       case 'discount':
-        const products = await Product.find({ _id: { $in: productIds } });
+        const products = await Application.find({ _id: { $in: productIds } });
         
         for (const product of products) {
           let newPrice = product.salePrice || 0;
@@ -1289,7 +1289,7 @@ router.post('/bulk-edit', async (req, res) => {
             newPrice -= value;
           }
           
-          await Product.findByIdAndUpdate(product._id, { salePrice: Math.max(0, newPrice) });
+          await Application.findByIdAndUpdate(product._id, { salePrice: Math.max(0, newPrice) });
           successCount++;
         }
         
@@ -1299,7 +1299,7 @@ router.post('/bulk-edit', async (req, res) => {
         });
 
       case 'delete':
-        const deleteResult = await Product.deleteMany({ _id: { $in: productIds } });
+        const deleteResult = await Application.deleteMany({ _id: { $in: productIds } });
         
         return res.json({
           success: true,
@@ -1315,7 +1315,7 @@ router.post('/bulk-edit', async (req, res) => {
 
     // For simple update operations
     if (Object.keys(updateQuery).length > 0) {
-      const result = await Product.updateMany(
+      const result = await Application.updateMany(
         { _id: { $in: productIds } },
         { $set: updateQuery }
       );
@@ -1344,7 +1344,7 @@ router.post('/bulk-export', async (req, res) => {
     if (!productIds || productIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Product IDs are required'
+        message: 'Application IDs are required'
       });
     }
 
@@ -1374,34 +1374,34 @@ router.get('/:id/related', async (req, res) => {
     const { limit = 6 } = req.query;
     
     // First, get the current product to know its category and subcategory
-    const currentProduct = await Product.findById(id);
+    const currentApplication = await Application.findById(id);
     
-    if (!currentProduct) {
+    if (!currentApplication) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: 'Application not found'
       });
     }
     
     // Get all active products except the current one
-    const allProducts = await Product.find({
+    const allApplications = await Application.find({
       status: 'active',
       stock: { $gt: 0 }
     }).populate('sellerId', 'shop.shopName email phoneNumber verified').lean();
     
     // Filter out the current product after fetching
-    const filteredProducts = allProducts.filter(product => product._id.toString() !== id);
+    const filteredApplications = allApplications.filter(product => product._id.toString() !== id);
     
     // Score and sort products
-    const scoredProducts = filteredProducts.map(product => {
+    const scoredApplications = filteredApplications.map(product => {
       let score = 0;
       
       // Same subcategory gets highest score (30 points)
-      if (product.subCategory === currentProduct.subCategory && product.category === currentProduct.category) {
+      if (product.subCategory === currentApplication.subCategory && product.category === currentApplication.category) {
         score = 30;
       }
       // Same category gets medium score (10 points)  
-      else if (product.category === currentProduct.category) {
+      else if (product.category === currentApplication.category) {
         score = 10;
       }
       
@@ -1412,7 +1412,7 @@ router.get('/:id/related', async (req, res) => {
     });
     
     // Sort by score (highest first), then by creation date (newest first)
-    const sortedProducts = scoredProducts.sort((a, b) => {
+    const sortedApplications = scoredApplications.sort((a, b) => {
       if (b.totalScore !== a.totalScore) {
         return b.totalScore - a.totalScore;
       }
@@ -1420,10 +1420,10 @@ router.get('/:id/related', async (req, res) => {
     });
     
     // Take top products
-    const relatedProducts = sortedProducts.slice(0, parseInt(limit));
+    const relatedApplications = sortedApplications.slice(0, parseInt(limit));
     
     // Transform the data to match frontend expectations
-    const transformedProducts = relatedProducts.map(product => ({
+    const transformedApplications = relatedApplications.map(product => ({
       id: product._id.toString(),
       name: product.title,
       price: product.salePrice,
@@ -1448,12 +1448,12 @@ router.get('/:id/related', async (req, res) => {
     
     res.json({
       success: true,
-      products: transformedProducts,
-      count: transformedProducts.length,
-      currentProduct: {
-        id: currentProduct._id,
-        category: currentProduct.category,
-        subCategory: currentProduct.subCategory
+      products: transformedApplications,
+      count: transformedApplications.length,
+      currentApplication: {
+        id: currentApplication._id,
+        category: currentApplication.category,
+        subCategory: currentApplication.subCategory
       }
     });
     

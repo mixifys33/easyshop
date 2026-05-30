@@ -11,11 +11,11 @@ const User = require('./models/User');
 const Seller = require('./models/Seller');
 
 // Import routes
-const productRoutes = require('./routes/products');
+
 const authRoutes = require('./routes/auth');
 const sellerRoutes = require('./routes/sellers');
 const categoryRoutes = require('./routes/categories');
-const draftRoutes = require('./routes/drafts');
+
 const imagekitRoutes = require('./routes/imagekit');
 const aiRoutes = require('./routes/ai');
 const aiSearchRoutes = require('./routes/aiSearch');
@@ -237,8 +237,8 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Routes
-app.use('/api/products/draft', draftRoutes);
-app.use('/api/products', productRoutes);
+
+
 app.use('/api/auth', authRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/categories', categoryRoutes);
