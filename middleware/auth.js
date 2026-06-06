@@ -41,6 +41,20 @@ const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
+    // Check if this is an admin token (has adminId or isAdmin)
+    if (decoded.adminId || decoded.isAdmin) {
+      // Admin token - don't look up in database, use token data directly
+      req.user = {
+        id: decoded.adminId,
+        email: decoded.email,
+        name: decoded.name,
+        role: 'admin',
+        isAdmin: true,
+        userType: 'Admin'
+      };
+      return next();
+    }
+    
     // Try to find user first
     let user = await User.findById(decoded.userId).select('-password');
     let userType = 'User';
