@@ -173,7 +173,6 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       stats: {
         sellers: { total: totalSellers, pending: pendingSellers, active: activeSellers, suspended: suspendedSellers },
         users: { total: totalUsers },
-        products: { total: totalProducts },
         orders: { total: totalOrders },
         applications: { total: totalApplications, pending: pendingApplications, verified: verifiedApplications },
         pushTokens: pushStats,
