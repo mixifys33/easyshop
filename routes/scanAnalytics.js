@@ -1,7 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const ScanAnalytics = require('../models/ScanAnalytics');
-const { protect, adminOnly } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
+
+// Admin auth middleware - checks if user is admin
+// Accepts both role='admin' and userType='Admin' for compatibility
+function adminOnly(req, res, next) {
+  const isAdmin = req.user?.role === 'admin' || 
+                  req.user?.userType === 'Admin' ||
+                  req.user?.isAdmin === true;
+  
+  if (!isAdmin) {
+    console.log('[Admin Check] User data:', { 
+      role: req.user?.role, 
+      userType: req.user?.userType,
+      isAdmin: req.user?.isAdmin,
+      email: req.user?.email 
+    });
+    return res.status(403).json({
+      success: false,
+      error: 'Admin access required'
+    });
+  }
+  next();
+}
 
 /**
  * @route   POST /api/scan-analytics
@@ -112,7 +134,7 @@ router.post('/', async (req, res) => {
  * @desc    Get analytics summary statistics
  * @access  Admin only
  */
-router.get('/summary', protect, adminOnly, async (req, res) => {
+router.get('/summary', authenticateToken, adminOnly, async (req, res) => {
   try {
     const { period = 'all', authenticated } = req.query;
 
@@ -224,7 +246,7 @@ router.get('/summary', protect, adminOnly, async (req, res) => {
  * @desc    Get paginated list of scans
  * @access  Admin only
  */
-router.get('/scans', protect, adminOnly, async (req, res) => {
+router.get('/scans', authenticateToken, adminOnly, async (req, res) => {
   try {
     const {
       page = 1,
@@ -299,7 +321,7 @@ router.get('/scans', protect, adminOnly, async (req, res) => {
  * @desc    Get scan analytics for a specific user
  * @access  Admin only (or the user themselves)
  */
-router.get('/user/:userId', protect, async (req, res) => {
+router.get('/user/:userId', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -361,7 +383,7 @@ router.get('/user/:userId', protect, async (req, res) => {
  * @desc    Get scan trends over time
  * @access  Admin only
  */
-router.get('/trends', protect, adminOnly, async (req, res) => {
+router.get('/trends', authenticateToken, adminOnly, async (req, res) => {
   try {
     const { period = 'week' } = req.query;
 
