@@ -11,19 +11,51 @@ function adminOnly(req, res, next) {
                   req.user?.isAdmin === true;
   
   if (!isAdmin) {
-    console.log('[Admin Check] User data:', { 
+    console.log('[Admin Check FAILED] User data:', { 
       role: req.user?.role, 
       userType: req.user?.userType,
       isAdmin: req.user?.isAdmin,
-      email: req.user?.email 
+      email: req.user?.email,
+      id: req.user?.id,
+      fullUser: JSON.stringify(req.user)
     });
     return res.status(403).json({
       success: false,
-      error: 'Admin access required'
+      error: 'Admin access required',
+      debug: {
+        hasUser: !!req.user,
+        role: req.user?.role,
+        userType: req.user?.userType,
+        isAdmin: req.user?.isAdmin
+      }
     });
   }
+  
+  console.log('[Admin Check SUCCESS] User:', req.user?.email);
   next();
 }
+
+/**
+ * @route   GET /api/scan-analytics/test-auth
+ * @desc    Test authentication and admin status
+ * @access  Authenticated users
+ */
+router.get('/test-auth', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication successful',
+    user: {
+      id: req.user?.id,
+      email: req.user?.email,
+      role: req.user?.role,
+      userType: req.user?.userType,
+      isAdmin: req.user?.isAdmin,
+    },
+    isAdminCheck: req.user?.role === 'admin' || 
+                   req.user?.userType === 'Admin' ||
+                   req.user?.isAdmin === true
+  });
+});
 
 /**
  * @route   POST /api/scan-analytics
