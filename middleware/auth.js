@@ -83,4 +83,19 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-module.exports = { auth, authenticateToken };
+// Alias for auth (commonly used name)
+const protect = auth;
+
+// Admin-only middleware
+const adminOnly = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ 
+      success: false,
+      message: 'Access denied. Admin only.' 
+    });
+  }
+};
+
+module.exports = { auth, authenticateToken, protect, adminOnly };
