@@ -36,6 +36,7 @@ const chatRoutes = require('./routes/chat');
 const applicationRoutes = require('./routes/applications');
 const flutterwaveRoutes = require('./routes/flutterwave');
 const preListedCodeRoutes = require('./routes/preListedCode');
+const scanAnalyticsRoutes = require('./routes/scanAnalytics');
 
 const app = express();
 const server = http.createServer(app);
@@ -262,6 +263,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/flutterwave', flutterwaveRoutes);
 app.use('/api/pre-listed-code', preListedCodeRoutes);
+app.use('/api/scan-analytics', scanAnalyticsRoutes);
 
 // Public shops listing — proxied through sellers router
 app.use('/api/shops', sellerRoutes);
