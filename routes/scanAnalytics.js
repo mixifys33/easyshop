@@ -207,15 +207,7 @@ router.get('/summary', authenticateToken, adminOnly, async (req, res) => {
     // Get summary statistics
     const summary = await ScanAnalytics.getSummaryStats(filters);
 
-    // Get scans by period
-    const scansToday = await ScanAnalytics.getScansByPeriod('day');
-    const scansThisWeek = await ScanAnalytics.getScansByPeriod('week');
-    const scansThisMonth = await ScanAnalytics.getScansByPeriod('month');
-
-    // Get top projects
-    const topProjects = await ScanAnalytics.getTopProjects(10);
-
-    // Get grade distribution
+    // Calculate most common grade
     const gradeDistribution = await ScanAnalytics.aggregate([
       { $match: filters },
       {
@@ -224,8 +216,18 @@ router.get('/summary', authenticateToken, adminOnly, async (req, res) => {
           count: { $sum: 1 },
         }
       },
-      { $sort: { _id: 1 } },
+      { $sort: { count: -1 } }, // Sort by count descending to get most common first
     ]);
+
+    const mostCommonGrade = gradeDistribution.length > 0 ? gradeDistribution[0]._id : null;
+
+    // Get scans by period
+    const scansToday = await ScanAnalytics.getScansByPeriod('day');
+    const scansThisWeek = await ScanAnalytics.getScansByPeriod('week');
+    const scansThisMonth = await ScanAnalytics.getScansByPeriod('month');
+
+    // Get top projects
+    const topProjects = await ScanAnalytics.getTopProjects(10);
 
     // Get scan mode distribution
     const scanModeDistribution = await ScanAnalytics.aggregate([
@@ -243,8 +245,9 @@ router.get('/summary', authenticateToken, adminOnly, async (req, res) => {
       data: {
         summary: {
           ...summary,
-          averageScore: Math.round(summary.averageScore * 10) / 10,
-          averageScanDuration: Math.round(summary.averageScanDuration / 1000), // Convert to seconds
+          averageScore: summary.totalScans > 0 ? Math.round(summary.averageScore * 10) / 10 : 0,
+          averageScanDuration: summary.totalScans > 0 ? parseFloat((summary.averageScanDuration / 1000).toFixed(2)) : 0, // Convert to seconds with 2 decimals
+          mostCommonGrade: mostCommonGrade,
         },
         timePeriods: {
           today: scansToday,
